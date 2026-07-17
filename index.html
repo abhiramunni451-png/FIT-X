@@ -1,0 +1,2437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeakPulse · Train With Data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<!-- Razorpay SDK -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+/* ============ RESET ============ */
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+
+:root{
+  --bg-body:#07080a;
+  --bg-section:#0a0c0e;
+  --bg-card:#111417;
+  --bg-card-hover:#151a1e;
+  --bg-glass: rgba(17,20,23,0.55);
+  --volt:#d4ff3f;
+  --volt-dim:rgba(212,255,63,0.12);
+  --coral:#ff5d5d;
+  --coral-dim:rgba(255,93,93,0.12);
+  --text-primary:#f4f6f2;
+  --text-secondary:#a9b3ad;
+  --text-muted:#697069;
+  --border:#1c211f;
+  --border-hover:#2a322d;
+  --shadow-sm:0 8px 24px rgba(0,0,0,0.55);
+  --shadow-lg:0 24px 60px rgba(0,0,0,0.7);
+  --radius:1.1rem;
+  --green:#4ade80;
+  --red:#f87171;
+}
+
+body{
+  font-family:'Inter',sans-serif;
+  background:var(--bg-body);
+  color:var(--text-primary);
+  line-height:1.55;
+  overflow-x:hidden;
+  position:relative;
+}
+
+.grain{
+  position:fixed; inset:0; z-index:999; pointer-events:none; opacity:0.035; mix-blend-mode:overlay;
+}
+
+.cursor-glow{
+  position:fixed; width:420px; height:420px; border-radius:50%; pointer-events:none; z-index:1;
+  background:radial-gradient(circle, rgba(212,255,63,0.06), transparent 70%);
+  transform:translate(-50%,-50%); transition:opacity 0.3s ease; opacity:0;
+}
+
+.display{ font-family:'Bebas Neue',sans-serif; letter-spacing:0.02em; }
+.mono{ font-family:'JetBrains Mono',monospace; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; scroll-behavior:auto !important; }
+}
+
+/* ============ UTIL ============ */
+.container{ max-width:1220px; margin:0 auto; padding:0 2rem; }
+.section-padding{ padding:6.5rem 0; }
+.eyebrow{
+  display:inline-flex; align-items:center; gap:0.5rem;
+  font-family:'JetBrains Mono',monospace; font-size:0.76rem; font-weight:500;
+  letter-spacing:0.14em; text-transform:uppercase; color:var(--volt);
+  margin-bottom:1.1rem;
+}
+.eyebrow::before{ content:''; width:18px; height:2px; background:var(--volt); display:inline-block; }
+.section-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:3.4rem; line-height:1.0; letter-spacing:0.01em;
+  margin-bottom:0.9rem; color:var(--text-primary); text-transform:uppercase;
+}
+.section-subtitle{ font-size:1.05rem; color:var(--text-secondary); max-width:560px; }
+.text-center{ text-align:center; }
+.reveal{ opacity:0; transform:translateY(28px); transition:opacity 0.7s cubic-bezier(.2,.7,.2,1), transform 0.7s cubic-bezier(.2,.7,.2,1); }
+.reveal.is-visible{ opacity:1; transform:translateY(0); }
+
+::selection{ background:var(--volt); color:#08090a; }
+:focus-visible{ outline:2px solid var(--volt); outline-offset:3px; border-radius:4px; }
+
+/* ============ BUTTONS ============ */
+.btn-primary, .btn-outline{
+  display:inline-flex; align-items:center; gap:0.6rem;
+  padding:0.95rem 2.1rem; border-radius:60px; font-weight:700; font-size:0.95rem;
+  cursor:pointer; transition:transform 0.2s cubic-bezier(.2,.7,.2,1), box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  text-decoration:none; font-family:'Inter',sans-serif; border:2px solid transparent; white-space:nowrap;
+  position:relative;
+}
+.btn-primary{ background:var(--volt); color:#08090a; box-shadow:0 8px 24px rgba(212,255,63,0.18); }
+.btn-primary:hover{ transform:translateY(-3px); box-shadow:0 14px 32px rgba(212,255,63,0.3); background:#e2ff6e; }
+.btn-primary:active{ transform:translateY(-1px); }
+.btn-outline{ background:transparent; color:var(--text-primary); border-color:var(--border-hover); }
+.btn-outline:hover{ border-color:var(--volt); color:var(--volt); transform:translateY(-2px); }
+
+/* ============ NAV ============ */
+.navbar{
+  padding:1.1rem 0; background:rgba(7,8,10,0.7); backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:200; transition:padding 0.3s ease, background 0.3s ease;
+}
+.navbar.scrolled{ padding:0.7rem 0; background:rgba(7,8,10,0.92); }
+.nav-inner{ display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+.logo{
+  display:flex; align-items:center; gap:8px; font-family:'Bebas Neue',sans-serif;
+  font-size:1.7rem; letter-spacing:0.03em; color:var(--text-primary); text-decoration:none;
+}
+.logo .pulse-dot{
+  width:9px; height:9px; border-radius:50%; background:var(--volt);
+  box-shadow:0 0 0 0 rgba(212,255,63,0.6); animation:dot-pulse 2s infinite;
+}
+@keyframes dot-pulse{
+  0%{ box-shadow:0 0 0 0 rgba(212,255,63,0.55); }
+  70%{ box-shadow:0 0 0 10px rgba(212,255,63,0); }
+  100%{ box-shadow:0 0 0 0 rgba(212,255,63,0); }
+}
+.nav-links{ display:flex; align-items:center; gap:2.2rem; list-style:none; }
+.nav-links a{
+  text-decoration:none; color:var(--text-secondary); font-weight:600; font-size:0.93rem;
+  transition:color 0.2s; position:relative;
+}
+.nav-links a:not(.nav-cta)::after{
+  content:''; position:absolute; bottom:-5px; left:0; width:0; height:2px;
+  background:var(--volt); transition:width 0.3s ease;
+}
+.nav-links a:not(.nav-cta):hover{ color:var(--text-primary); }
+.nav-links a:not(.nav-cta):hover::after{ width:100%; }
+.nav-cta{ background:var(--volt); color:#08090a !important; padding:0.55rem 1.4rem; border-radius:60px; font-weight:700 !important; }
+.nav-cta:hover{ background:#e2ff6e; }
+.nav-toggle{ display:none; background:none; border:none; color:var(--text-primary); font-size:1.4rem; cursor:pointer; padding:0.3rem; }
+
+/* User greeting in nav */
+.user-greeting {
+  display:flex;
+  align-items:center;
+  gap:0.6rem;
+  color:var(--text-primary);
+  font-weight:600;
+  font-size:0.93rem;
+}
+.user-greeting i {
+  color:var(--volt);
+}
+.user-greeting .logout-btn {
+  background:transparent;
+  border:1px solid var(--border-hover);
+  color:var(--text-secondary);
+  padding:0.3rem 0.8rem;
+  border-radius:60px;
+  font-size:0.75rem;
+  cursor:pointer;
+  transition:all 0.2s ease;
+  font-family:'Inter',sans-serif;
+}
+.user-greeting .logout-btn:hover {
+  border-color:var(--coral);
+  color:var(--coral);
+}
+
+/* ============ HERO ============ */
+.hero{
+  padding:5.5rem 0 6rem; position:relative; overflow:hidden;
+  background:
+    radial-gradient(ellipse 900px 500px at 85% -10%, rgba(212,255,63,0.08), transparent 60%),
+    radial-gradient(ellipse 600px 400px at -10% 110%, rgba(255,93,93,0.05), transparent 60%),
+    var(--bg-body);
+  border-bottom:1px solid var(--border);
+}
+.hero-grid{ position:relative; z-index:2; display:grid; grid-template-columns:1fr; max-width:820px; margin:0 auto; text-align:center; }
+.hero-eyebrow{ display:flex; align-items:center; gap:0.6rem; margin-bottom:1.3rem; justify-content:center; }
+.hero-eyebrow .live-dot{ width:8px; height:8px; border-radius:50%; background:var(--coral); animation:dot-pulse 1.6s infinite; box-shadow:0 0 0 0 rgba(255,93,93,0.6); }
+.hero-content h1{
+  font-family:'Bebas Neue',sans-serif; font-size:4.6rem; line-height:0.96; letter-spacing:0.005em;
+  text-transform:uppercase; margin-bottom:1.4rem; color:var(--text-primary);
+}
+.hero-content h1 .hl{ color:var(--volt); }
+.hero-content p{ font-size:1.14rem; color:var(--text-secondary); max-width:480px; margin:0 auto 2.2rem; }
+.hero-buttons{ display:flex; flex-wrap:wrap; gap:1rem; justify-content:center; margin-bottom:2.8rem; }
+.hero-proof{ display:flex; align-items:center; justify-content:center; gap:1rem; }
+.avatar-stack{ display:flex; }
+.avatar-stack span{
+  width:34px; height:34px; border-radius:50%; border:2px solid var(--bg-body); margin-left:-10px;
+  display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono',monospace;
+  font-size:0.68rem; font-weight:700; color:#08090a;
+}
+.avatar-stack span:first-child{ margin-left:0; }
+.hero-proof .proof-text{ font-size:0.85rem; color:var(--text-muted); }
+.hero-proof .proof-text strong{ color:var(--text-primary); }
+
+/* ============ MARQUEE ============ */
+.marquee-band{ background:var(--bg-card); border-bottom:1px solid var(--border); padding:1.1rem 0; overflow:hidden; }
+.marquee-track{ display:flex; width:max-content; animation:marquee 32s linear infinite; }
+.marquee-track span{
+  display:flex; align-items:center; gap:0.8rem; font-family:'Bebas Neue',sans-serif; font-size:1.3rem;
+  letter-spacing:0.03em; color:var(--text-muted); text-transform:uppercase; padding:0 2rem; white-space:nowrap;
+}
+.marquee-track span i{ color:var(--volt); font-size:0.6rem; }
+@keyframes marquee{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
+
+/* ============ CATEGORIES ============ */
+.categories{ background:var(--bg-section); position:relative; }
+.category-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:1.6rem; margin-top:3rem; }
+.category-card{
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:2rem 1.6rem; text-align:left; transition:transform 0.3s cubic-bezier(.2,.7,.2,1), box-shadow 0.3s ease, border-color 0.3s ease;
+  box-shadow:var(--shadow-sm); cursor:default; position:relative; overflow:hidden;
+}
+.category-card::before{
+  content:''; position:absolute; inset:0; background:linear-gradient(135deg, var(--volt-dim), transparent 60%);
+  opacity:0; transition:opacity 0.3s ease;
+}
+.category-card:hover{ transform:translateY(-8px); box-shadow:var(--shadow-lg); border-color:var(--border-hover); }
+.category-card:hover::before{ opacity:1; }
+.category-card i{ font-size:1.9rem; color:var(--volt); margin-bottom:1.1rem; display:inline-block; transition:transform 0.3s ease; position:relative; }
+.category-card:hover i{ transform:scale(1.15) rotate(-4deg); }
+.category-card h4{ font-size:1.15rem; font-weight:700; margin-bottom:0.35rem; color:var(--text-primary); position:relative; }
+.category-card p{ color:var(--text-muted); font-size:0.9rem; position:relative; }
+
+/* ============ COACHES ============ */
+.coaches{ 
+  background:var(--bg-body); 
+  border-bottom:1px solid var(--border);
+  position:relative;
+  cursor:pointer;
+}
+.coaches .container {
+  position:relative;
+  z-index:2;
+}
+.coach-grid{ 
+  display:grid; 
+  grid-template-columns:repeat(auto-fit, minmax(230px,1fr)); 
+  gap:1.6rem; 
+  margin-top:3rem; 
+}
+.coach-card{
+  background:rgba(17,20,23,0.7);
+  backdrop-filter:blur(20px);
+  border:1px solid rgba(212,255,63,0.15);
+  border-radius:var(--radius); 
+  padding:2.2rem;
+  transition:transform 0.3s ease, border-color 0.3s ease;
+  cursor:pointer;
+}
+.coach-card:hover{ 
+  transform:translateY(-6px); 
+  border-color:var(--volt);
+  box-shadow:0 0 40px rgba(212,255,63,0.08);
+}
+.coach-avatar{
+  width:80px;
+  height:80px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.8rem;
+  color:#08090a;
+  margin:0 auto 1.1rem;
+  overflow:hidden;
+  border:3px solid var(--volt);
+  box-shadow:0 0 30px rgba(212,255,63,0.25);
+  background:var(--volt);
+}
+.coach-card h4{ 
+  font-size:1.2rem; 
+  margin-bottom:0.2rem; 
+  text-align:center;
+  color:var(--text-primary);
+}
+.coach-card .role{ 
+  font-family:'JetBrains Mono',monospace; 
+  font-size:0.72rem; 
+  color:var(--volt); 
+  text-transform:uppercase; 
+  letter-spacing:0.06em; 
+  margin-bottom:0.9rem; 
+  text-align:center; 
+  min-height:24px;
+}
+.coach-card .bio-text{ 
+  color:var(--text-secondary); 
+  font-size:0.87rem; 
+  text-align:center;
+  min-height:60px;
+  line-height:1.6;
+}
+.cursor-blink {
+  display:inline-block;
+  width:2px;
+  height:1em;
+  background:var(--volt);
+  margin-left:2px;
+  animation:blink 0.8s step-end infinite;
+  vertical-align:text-bottom;
+}
+@keyframes blink {
+  0%, 100% { opacity:1; }
+  50% { opacity:0; }
+}
+
+/* ============ COACH MODAL ============ */
+.coach-modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(4,5,6,0.92);
+  backdrop-filter:blur(12px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+  padding:2rem;
+  opacity:0;
+  transition:opacity 0.4s ease;
+}
+.coach-modal-overlay.open{ display:flex; }
+.coach-modal-overlay.show{ opacity:1; }
+.coach-modal-box{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:1.5rem;
+  max-width:800px;
+  width:100%;
+  max-height:90vh;
+  overflow-y:auto;
+  box-shadow:var(--shadow-lg);
+  transform:translateY(30px) scale(0.95);
+  transition:transform 0.4s cubic-bezier(.2,.7,.2,1);
+  position:relative;
+}
+.coach-modal-overlay.show .coach-modal-box{
+  transform:translateY(0) scale(1);
+}
+.coach-modal-box::-webkit-scrollbar{ width:6px; }
+.coach-modal-box::-webkit-scrollbar-thumb{ background:var(--border-hover); border-radius:6px; }
+.coach-modal-close{
+  position:absolute;
+  top:1.2rem;
+  right:1.4rem;
+  background:rgba(0,0,0,0.5);
+  border:none;
+  color:var(--text-primary);
+  font-size:1.4rem;
+  cursor:pointer;
+  transition:all 0.2s ease;
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10;
+}
+.coach-modal-close:hover{
+  background:rgba(255,255,255,0.15);
+  transform:rotate(90deg);
+}
+.coach-modal-content{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+}
+.coach-modal-image{
+  position:relative;
+  min-height:400px;
+  background: url('gym.jpeg') center 40% / cover no-repeat;
+  border-radius:1.5rem 0 0 1.5rem;
+}
+.coach-modal-image .badge{
+  position:absolute;
+  bottom:1.5rem;
+  left:1.5rem;
+  background:rgba(212,255,63,0.9);
+  color:#08090a;
+  padding:0.4rem 1rem;
+  border-radius:60px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.7rem;
+  font-weight:700;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+}
+.coach-modal-info{
+  padding:2.5rem;
+}
+.coach-modal-info .avatar-big{
+  width:80px;
+  height:80px;
+  border-radius:50%;
+  background:var(--volt);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:2.2rem;
+  color:#08090a;
+  margin-bottom:1rem;
+}
+.coach-modal-info h2{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:2.4rem;
+  text-transform:uppercase;
+  margin-bottom:0.3rem;
+  color:var(--text-primary);
+}
+.coach-modal-info .modal-role{
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.8rem;
+  color:var(--volt);
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  margin-bottom:1rem;
+}
+.coach-modal-info .modal-bio{
+  color:var(--text-secondary);
+  font-size:0.95rem;
+  line-height:1.7;
+  margin-bottom:1.5rem;
+}
+.coach-modal-info .modal-specs{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0.8rem;
+}
+.coach-modal-info .spec-item{
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:0.6rem;
+  padding:0.8rem 1rem;
+  text-align:center;
+}
+.coach-modal-info .spec-item .label{
+  font-size:0.65rem;
+  color:var(--text-muted);
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+}
+.coach-modal-info .spec-item .value{
+  font-family:'JetBrains Mono',monospace;
+  font-size:1rem;
+  color:var(--text-primary);
+  font-weight:600;
+}
+
+/* ============ WORKOUT ALGORITHM ============ */
+.algo{ background:var(--bg-section); border-bottom:1px solid var(--border); }
+.algo-panel{
+  display:grid; grid-template-columns:0.9fr 1.1fr; gap:0; margin-top:3rem;
+  border:1px solid var(--border); border-radius:1.4rem; overflow:hidden; background:var(--bg-card);
+  box-shadow:var(--shadow-lg);
+}
+.algo-form{ padding:2.6rem; border-right:1px solid var(--border); }
+.form-group{ margin-bottom:1.7rem; }
+.form-group label{
+  display:block; font-family:'JetBrains Mono',monospace; font-size:0.75rem; text-transform:uppercase;
+  letter-spacing:0.08em; color:var(--text-muted); margin-bottom:0.7rem;
+}
+.pill-row{ display:flex; flex-wrap:wrap; gap:0.55rem; }
+.pill{
+  padding:0.6rem 1.1rem; border-radius:60px; border:1.5px solid var(--border-hover);
+  background:transparent; color:var(--text-secondary); font-size:0.86rem; font-weight:600;
+  cursor:pointer; transition:all 0.2s ease; font-family:'Inter',sans-serif;
+}
+.pill:hover{ border-color:var(--volt); color:var(--text-primary); }
+.pill.active{ background:var(--volt); border-color:var(--volt); color:#08090a; }
+.days-stepper{ display:flex; align-items:center; gap:1.1rem; }
+.days-stepper button{
+  width:38px; height:38px; border-radius:50%; border:1.5px solid var(--border-hover); background:transparent;
+  color:var(--text-primary); font-size:1.1rem; cursor:pointer; transition:all 0.2s ease;
+}
+.days-stepper button:hover{ border-color:var(--volt); color:var(--volt); }
+.days-stepper .days-val{ font-family:'JetBrains Mono',monospace; font-size:1.5rem; font-weight:700; min-width:2.4ch; text-align:center; }
+.algo-form .btn-primary{ width:100%; justify-content:center; margin-top:0.6rem; }
+
+.algo-output{ padding:2.6rem; max-height:640px; overflow-y:auto; }
+.algo-output::-webkit-scrollbar{ width:6px; }
+.algo-output::-webkit-scrollbar-thumb{ background:var(--border-hover); border-radius:6px; }
+.output-placeholder{ display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:400px; text-align:center; color:var(--text-muted); }
+.output-placeholder i{ font-size:2.4rem; color:var(--border-hover); margin-bottom:1rem; }
+.output-placeholder.locked i{ color:var(--volt); }
+.output-placeholder .unlock-btn{ margin-top:1.4rem; }
+.plan-header{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:1rem; flex-wrap:wrap; gap:0.6rem; }
+.plan-header h3{ font-family:'Bebas Neue',sans-serif; font-size:1.7rem; letter-spacing:0.02em; text-transform:uppercase; }
+.plan-header .tag{ font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--volt); border:1px solid var(--volt-dim); padding:0.3rem 0.7rem; border-radius:60px; }
+.day-card{
+  border:1px solid var(--border); border-radius:0.9rem; padding:1.2rem 1.4rem; margin-bottom:0.9rem;
+  opacity:0; transform:translateX(-14px); animation:slide-in 0.45s ease forwards; background:var(--bg-card-hover);
+}
+@keyframes slide-in{ to{ opacity:1; transform:translateX(0); } }
+.day-card .day-title{ display:flex; justify-content:space-between; align-items:center; margin-bottom:0.7rem; }
+.day-card .day-title strong{ font-size:1rem; color:var(--text-primary); }
+.day-card .day-title span{ font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--coral); text-transform:uppercase; letter-spacing:0.06em; }
+.exercise-row{ display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-top:1px dashed var(--border); font-size:0.9rem; color:var(--text-secondary); }
+.exercise-row:first-of-type{ border-top:none; }
+.exercise-row .ex-name{ color:var(--text-primary); font-weight:500; }
+.exercise-row .ex-scheme{ font-family:'JetBrains Mono',monospace; font-size:0.82rem; color:var(--volt); white-space:nowrap; }
+.exercise-row .ex-muscles{ font-size:0.7rem; color:var(--text-muted); font-style:italic; }
+
+/* Checklist */
+.checklist-container{
+  margin-top:2rem;
+  border-top:1px solid var(--border);
+  padding-top:1.5rem;
+}
+.checklist-container h5{
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.8rem;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  color:var(--text-muted);
+  margin-bottom:1rem;
+}
+.checklist-item{
+  display:flex;
+  align-items:center;
+  gap:0.8rem;
+  padding:0.5rem 0.6rem;
+  border-radius:0.6rem;
+  background:var(--bg-body);
+  margin-bottom:0.5rem;
+  border:1px solid var(--border);
+  transition:background 0.2s;
+}
+.checklist-item:hover{ background:var(--bg-card-hover); }
+.checklist-item input[type="checkbox"]{
+  width:18px; height:18px;
+  accent-color:var(--volt);
+  cursor:pointer;
+  flex-shrink:0;
+}
+.checklist-item .ex-name{ flex:1; font-size:0.9rem; color:var(--text-primary); }
+.checklist-item .ex-muscles{ font-size:0.7rem; color:var(--text-muted); font-style:italic; margin-right:0.5rem; }
+.checklist-item .ex-scheme{ font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--volt); }
+.checklist-item.done{ opacity:0.6; border-color:var(--volt-dim); }
+.checklist-item.done .ex-name{ text-decoration:line-through; color:var(--text-muted); }
+.checklist-save-btn{ margin-top:0.8rem; width:100%; justify-content:center; }
+
+/* ============ PRICING ============ */
+.pricing{ background:var(--bg-body); border-bottom:1px solid var(--border); }
+.price-grid{ display:grid; grid-template-columns:1fr; gap:1.6rem; margin-top:3rem; align-items:start; max-width:480px; margin-left:auto; margin-right:auto; }
+.price-card{
+  background:var(--bg-card); border:1px solid var(--border); border-radius:1.3rem; padding:2.2rem; transition:transform 0.3s ease, border-color 0.3s ease;
+}
+.price-card:hover{ transform:translateY(-6px); }
+.price-card.featured{ border-color:var(--volt); background:linear-gradient(180deg, var(--volt-dim), var(--bg-card) 40%); position:relative; transform:scale(1.03); }
+.price-card.featured::before{ content:'MOST POPULAR'; position:absolute; top:-13px; left:50%; transform:translateX(-50%); background:var(--volt); color:#08090a; font-family:'JetBrains Mono',monospace; font-size:0.65rem; font-weight:700; letter-spacing:0.08em; padding:0.35rem 0.9rem; border-radius:60px; }
+.price-card h4{ font-size:1.2rem; margin-bottom:0.4rem; text-align:center; }
+.price-card .price{ font-family:'Bebas Neue',sans-serif; font-size:2.8rem; color:var(--text-primary); margin-bottom:0.2rem; text-align:center; }
+.price-card .price span{ font-family:'Inter',sans-serif; font-size:0.9rem; color:var(--text-muted); font-weight:500; }
+.price-card .desc{ color:var(--text-muted); font-size:0.85rem; margin-bottom:1.6rem; text-align:center; }
+.price-list{ list-style:none; margin-bottom:1.8rem; }
+.price-list li{ display:flex; align-items:center; gap:0.6rem; font-size:0.87rem; color:var(--text-secondary); padding:0.6rem 0; border-top:1px solid var(--border); }
+.price-list li:first-child{ border-top:none; }
+.price-list li i{ color:var(--volt); font-size:0.8rem; }
+.price-card .btn-primary, .price-card .btn-outline{ width:100%; justify-content:center; }
+
+/* ============ FINAL CTA ============ */
+.final-cta{
+  padding:5.5rem 0; text-align:center; position:relative; overflow:hidden;
+  background:radial-gradient(ellipse 700px 400px at 50% 0%, rgba(212,255,63,0.1), transparent 65%), var(--bg-section);
+  border-bottom:1px solid var(--border);
+}
+.final-cta h2{ font-family:'Bebas Neue',sans-serif; font-size:3.4rem; text-transform:uppercase; margin-bottom:1rem; }
+.final-cta p{ color:var(--text-secondary); max-width:480px; margin:0 auto 2.2rem; }
+
+/* Free Session Features */
+.free-features-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
+  gap:1.2rem;
+  max-width:750px;
+  margin:1.8rem auto 2rem;
+  text-align:left;
+}
+.free-feature-card{
+  background:rgba(17,20,23,0.5);
+  border:1px solid var(--border);
+  border-radius:0.8rem;
+  padding:1.2rem 1.2rem;
+  transition:border-color 0.3s ease, transform 0.3s ease;
+  display:flex;
+  align-items:flex-start;
+  gap:0.8rem;
+}
+.free-feature-card:hover{
+  border-color:var(--volt);
+  transform:translateY(-3px);
+}
+.free-feature-card .icon{ font-size:1.3rem; flex-shrink:0; margin-top:2px; }
+.free-feature-card .icon.available{ color:var(--green); }
+.free-feature-card .icon.not-available{ color:var(--red); }
+.free-feature-card .content h4{
+  color:var(--text-primary);
+  font-size:0.9rem;
+  margin-bottom:0.15rem;
+}
+.free-feature-card .content p{
+  color:var(--text-muted);
+  font-size:0.78rem;
+  line-height:1.4;
+}
+
+/* Premium Features (not included) */
+.premium-notice{
+  max-width:600px;
+  margin:0 auto 2.2rem;
+  padding:1rem 1.5rem;
+  background:rgba(255,93,93,0.05);
+  border:1px solid rgba(255,93,93,0.15);
+  border-radius:0.8rem;
+}
+.premium-notice p{
+  color:var(--text-muted);
+  font-size:0.8rem;
+  text-align:center;
+  line-height:1.8;
+}
+.premium-notice .premium-item{
+  display:inline-block;
+  margin:0 0.5rem;
+}
+.premium-notice .premium-item .cross{
+  color:var(--red);
+  margin-right:4px;
+}
+.premium-notice .label{
+  color:var(--text-secondary);
+  font-weight:600;
+}
+
+/* ============ SUBSCRIPTION MODAL ============ */
+.sub-modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(4,5,6,0.85);
+  backdrop-filter:blur(8px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:2000;
+  padding:2rem;
+  opacity:0;
+  transition:opacity 0.4s ease;
+}
+.sub-modal-overlay.open{ display:flex; }
+.sub-modal-overlay.show{ opacity:1; }
+
+.sub-modal-box{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:1.5rem;
+  max-width:560px;
+  width:100%;
+  padding:2.5rem;
+  box-shadow:var(--shadow-lg);
+  transform:translateY(30px) scale(0.95);
+  transition:transform 0.4s cubic-bezier(.2,.7,.2,1);
+  position:relative;
+}
+.sub-modal-overlay.show .sub-modal-box{
+  transform:translateY(0) scale(1);
+}
+.sub-modal-close{
+  position:absolute;
+  top:1.2rem;
+  right:1.4rem;
+  background:rgba(255,255,255,0.05);
+  border:none;
+  color:var(--text-muted);
+  font-size:1.2rem;
+  cursor:pointer;
+  transition:all 0.3s ease;
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.sub-modal-close:hover{
+  background:rgba(255,255,255,0.1);
+  color:var(--text-primary);
+  transform:rotate(90deg);
+}
+.sub-modal-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:2rem;
+  text-transform:uppercase;
+  color:var(--text-primary);
+  margin-bottom:0.3rem;
+  text-align:center;
+}
+.sub-modal-sub{
+  color:var(--text-secondary);
+  font-size:0.9rem;
+  text-align:center;
+  margin-bottom:2rem;
+}
+
+.sub-plans{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:1.2rem;
+}
+.sub-plan-card{
+  background:rgba(255,255,255,0.03);
+  border:2px solid var(--border);
+  border-radius:1rem;
+  padding:1.8rem 1.2rem;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.4s cubic-bezier(.2,.7,.2,1);
+  position:relative;
+  opacity:0.4;
+  filter:blur(2px);
+  transform:scale(0.95);
+}
+.sub-plan-card:hover{
+  opacity:0.6;
+  transform:scale(0.97);
+}
+.sub-plan-card .plan-badge{
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.6rem;
+  text-transform:uppercase;
+  letter-spacing:0.08em;
+  color:var(--text-muted);
+  margin-bottom:0.3rem;
+}
+.sub-plan-card .plan-price{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:2rem;
+  color:var(--text-muted);
+  transition:all 0.4s ease;
+}
+.sub-plan-card .plan-price span{
+  font-family:'Inter',sans-serif;
+  font-size:0.8rem;
+  color:var(--text-muted);
+  font-weight:500;
+}
+.sub-plan-card .plan-desc{
+  color:var(--text-muted);
+  font-size:0.75rem;
+  margin-top:0.3rem;
+  opacity:0.6;
+}
+.sub-plan-card .plan-features{
+  list-style:none;
+  margin-top:1rem;
+  text-align:left;
+}
+.sub-plan-card .plan-features li{
+  font-size:0.78rem;
+  color:var(--text-secondary);
+  padding:0.3rem 0;
+  display:flex;
+  align-items:center;
+  gap:0.5rem;
+  border-top:1px solid rgba(255,255,255,0.03);
+  opacity:0.5;
+  transition:opacity 0.3s ease;
+}
+.sub-plan-card .plan-features li:first-child{ border-top:none; }
+.sub-plan-card .plan-features li i{
+  color:var(--volt);
+  font-size:0.7rem;
+  opacity:0.5;
+}
+
+/* Popular badge */
+.sub-plan-card.popular{
+  border-color:rgba(212,255,63,0.3);
+}
+.sub-plan-card.popular .plan-badge{
+  color:var(--volt);
+}
+.sub-plan-card.popular::before{
+  content:'BEST VALUE';
+  position:absolute;
+  top:-10px;
+  left:50%;
+  transform:translateX(-50%);
+  background:var(--volt);
+  color:#08090a;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.55rem;
+  font-weight:700;
+  letter-spacing:0.06em;
+  padding:0.2rem 0.8rem;
+  border-radius:60px;
+  opacity:0;
+  transition:opacity 0.3s ease;
+}
+.sub-plan-card.popular:hover::before{
+  opacity:0.5;
+}
+
+/* Selected state */
+.sub-plan-card.selected{
+  border-color:var(--volt);
+  box-shadow:0 0 40px rgba(212,255,63,0.2);
+  background:linear-gradient(180deg, var(--volt-dim), rgba(17,20,23,0.9));
+  opacity:1 !important;
+  filter:blur(0px) !important;
+  transform:scale(1) !important;
+}
+.sub-plan-card.selected .plan-price{
+  font-size:2.8rem;
+  color:var(--text-primary);
+}
+.sub-plan-card.selected .plan-price span{
+  color:var(--text-secondary);
+}
+.sub-plan-card.selected .plan-desc{
+  opacity:1;
+  color:var(--text-secondary);
+}
+.sub-plan-card.selected .plan-features li{
+  opacity:1;
+}
+.sub-plan-card.selected .plan-features li i{
+  opacity:1;
+}
+.sub-plan-card.selected::after{
+  content:'✓ SELECTED';
+  position:absolute;
+  bottom:-10px;
+  left:50%;
+  transform:translateX(-50%);
+  background:var(--volt);
+  color:#08090a;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.55rem;
+  font-weight:700;
+  letter-spacing:0.06em;
+  padding:0.2rem 0.8rem;
+  border-radius:60px;
+}
+.sub-plan-card.selected.popular::before{
+  opacity:1;
+}
+
+.sub-modal-actions{
+  margin-top:1.8rem;
+  display:flex;
+  gap:0.8rem;
+  justify-content:center;
+}
+.sub-modal-actions .btn-primary{
+  flex:1;
+  justify-content:center;
+}
+
+/* Payment Success Modal */
+.payment-success-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(4,5,6,0.9);
+  backdrop-filter:blur(10px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:3000;
+  padding:2rem;
+  opacity:0;
+  transition:opacity 0.5s ease;
+}
+.payment-success-overlay.open{ display:flex; }
+.payment-success-overlay.show{ opacity:1; }
+
+.payment-success-box{
+  background:var(--bg-card);
+  border:1px solid var(--volt);
+  border-radius:1.5rem;
+  max-width:480px;
+  width:100%;
+  padding:3rem 2.5rem;
+  text-align:center;
+  box-shadow:0 0 60px rgba(212,255,63,0.1);
+  transform:scale(0.9);
+  transition:transform 0.4s cubic-bezier(.2,.7,.2,1);
+}
+.payment-success-overlay.show .payment-success-box{
+  transform:scale(1);
+}
+.payment-success-box .success-icon{
+  font-size:4rem;
+  color:var(--green);
+  margin-bottom:1rem;
+}
+.payment-success-box h2{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:2.5rem;
+  text-transform:uppercase;
+  color:var(--text-primary);
+  margin-bottom:0.5rem;
+}
+.payment-success-box p{
+  color:var(--text-secondary);
+  font-size:0.95rem;
+  margin-bottom:0.3rem;
+}
+.payment-success-box .plan-detail{
+  color:var(--volt);
+  font-weight:600;
+  font-size:1.1rem;
+  margin:0.5rem 0 1.5rem;
+}
+.payment-success-box .btn-primary{
+  min-width:200px;
+  justify-content:center;
+}
+
+/* ============ FOOTER ============ */
+.footer{ padding:3.6rem 0 2rem; background:var(--bg-card); }
+.footer-grid{ display:grid; grid-template-columns:2fr 1fr 1fr 1.3fr; gap:2rem; }
+.footer-brand p{ color:var(--text-muted); max-width:280px; margin-top:0.7rem; font-size:0.9rem; }
+.footer-links h5{ font-family:'JetBrains Mono',monospace; font-size:0.76rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:700; margin-bottom:1rem; color:var(--text-primary); }
+.footer-links a{ display:block; color:var(--text-muted); text-decoration:none; margin-bottom:0.6rem; transition:color 0.2s; font-size:0.9rem; }
+.footer-links a:hover{ color:var(--volt); }
+.newsletter{ display:flex; margin-top:0.4rem; border:1px solid var(--border-hover); border-radius:60px; overflow:hidden; max-width:280px; }
+.newsletter input{ flex:1; background:transparent; border:none; padding:0.7rem 1rem; color:var(--text-primary); font-size:0.85rem; font-family:'Inter',sans-serif; }
+.newsletter input:focus{ outline:none; }
+.newsletter button{ background:var(--volt); border:none; padding:0 1.1rem; color:#08090a; font-weight:700; cursor:pointer; font-size:0.9rem; }
+.footer-bottom{ text-align:center; padding-top:2rem; margin-top:2.2rem; border-top:1px solid var(--border); color:var(--text-muted); font-size:0.82rem; }
+
+/* ============ AUTH MODAL ============ */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(4,5,6,0.82); backdrop-filter:blur(6px);
+  display:none; align-items:center; justify-content:center; z-index:500; padding:1.5rem;
+  opacity:0; transition:opacity 0.25s ease;
+}
+.modal-overlay.open{ display:flex; }
+.modal-overlay.show{ opacity:1; }
+.modal-box{
+  background:var(--bg-card); border:1px solid var(--border); border-radius:1.2rem;
+  padding:2.4rem; max-width:440px; width:100%; max-height:88vh; overflow-y:auto;
+  box-shadow:var(--shadow-lg); transform:translateY(16px) scale(0.98); transition:transform 0.25s ease;
+}
+.modal-overlay.show .modal-box{ transform:translateY(0) scale(1); }
+.modal-box::-webkit-scrollbar{ width:6px; }
+.modal-box::-webkit-scrollbar-thumb{ background:var(--border-hover); border-radius:6px; }
+.modal-box h3{
+  font-family:'Bebas Neue',sans-serif; font-size:2rem; letter-spacing:0.02em; text-transform:uppercase;
+  margin-bottom:0.5rem; color:var(--text-primary);
+}
+.modal-box .modal-sub{ color:var(--text-secondary); font-size:0.92rem; margin-bottom:1.8rem; }
+.field-input{
+  width:100%; padding:0.8rem 1rem; border-radius:0.7rem; border:1.5px solid var(--border-hover);
+  background:var(--bg-body); color:var(--text-primary); font-family:'Inter',sans-serif; font-size:0.92rem;
+  transition:border-color 0.2s ease;
+}
+.field-input:focus{ outline:none; border-color:var(--volt); }
+.field-error{ font-size:0.78rem; color:var(--coral); margin-top:0.4rem; display:none; }
+.form-group.invalid .field-input{ border-color:var(--coral); }
+.form-group.invalid .field-error{ display:block; }
+.modal-actions{ display:flex; justify-content:flex-end; gap:0.8rem; margin-top:0.6rem; flex-wrap:wrap; }
+.modal-close-x{
+  position:absolute; top:1.2rem; right:1.4rem; background:none; border:none; color:var(--text-muted);
+  font-size:1.2rem; cursor:pointer; transition:color 0.2s ease;
+}
+.modal-close-x:hover{ color:var(--text-primary); }
+.modal-box{ position:relative; }
+.auth-toggle-link{ color:var(--volt); cursor:pointer; font-weight:600; }
+.auth-toggle-link:hover{ text-decoration:underline; }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width:992px){
+  .hero-grid{ grid-template-columns:1fr; text-align:center; }
+  .hero-content p{ margin-left:auto; margin-right:auto; }
+  .hero-eyebrow, .hero-buttons{ justify-content:center; }
+  .hero-proof{ justify-content:center; }
+  .hero-content h1{ font-size:3.6rem; }
+  .footer-grid{ grid-template-columns:1fr 1fr; }
+  .algo-panel{ grid-template-columns:1fr; }
+  .algo-form{ border-right:none; border-bottom:1px solid var(--border); }
+  .price-grid{ grid-template-columns:1fr; max-width:420px; margin-left:auto; margin-right:auto; }
+  .price-card.featured{ transform:scale(1); order:-1; }
+  .coach-modal-content{ grid-template-columns:1fr; }
+  .coach-modal-image{ min-height:300px; border-radius:1.5rem 1.5rem 0 0; }
+  .free-features-grid{ grid-template-columns:1fr 1fr; }
+  .sub-plans{ grid-template-columns:1fr; max-width:300px; margin:0 auto; }
+}
+@media (max-width:650px){
+  .container{ padding:0 1.2rem; }
+  .section-padding{ padding:3.8rem 0; }
+  .section-title{ font-size:2.2rem; }
+  .hero-content h1{ font-size:2.5rem; }
+  .footer-grid{ grid-template-columns:1fr; gap:1.6rem; }
+  .nav-links{
+    position:fixed; top:64px; left:0; right:0; background:rgba(7,8,10,0.98); backdrop-filter:blur(14px);
+    flex-direction:column; align-items:flex-start; padding:1.6rem 2rem; gap:1.3rem;
+    border-bottom:1px solid var(--border); transform:translateY(-140%); transition:transform 0.35s ease; z-index:150;
+  }
+  .nav-links.open{ transform:translateY(0); }
+  .nav-toggle{ display:block; }
+  .algo-form, .algo-output{ padding:1.6rem; }
+  .day-card{ padding:1rem; }
+  .final-cta h2{ font-size:2.3rem; }
+  .cursor-glow{ display:none; }
+  .modal-box{ padding:1.8rem; }
+  .coach-modal-info .modal-specs{ grid-template-columns:1fr; }
+  .free-features-grid{ grid-template-columns:1fr; }
+  .sub-modal-box{ padding:1.8rem; }
+  .sub-plans{ grid-template-columns:1fr; max-width:100%; }
+}
+@media (max-width:400px){
+  .hero-content h1{ font-size:2.05rem; }
+  .btn-primary, .btn-outline{ padding:0.75rem 1.5rem; font-size:0.88rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- Grain overlay -->
+<svg class="grain" width="100%" height="100%">
+  <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/></filter>
+  <rect width="100%" height="100%" filter="url(#noise)"/>
+</svg>
+<div class="cursor-glow" id="cursorGlow"></div>
+
+<nav class="navbar" id="navbar">
+  <div class="container nav-inner">
+    <a href="#" class="logo"><span class="pulse-dot"></span>PEAKPULSE</a>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu"><i class="fas fa-bars"></i></button>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#categories">Services</a></li>
+      <li><a href="#coaches">Coach</a></li>
+      <li><a href="#builder">Build My Plan</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li>
+        <span id="authNavContainer">
+          <a href="#" class="nav-cta" id="authNavBtn"><i class="fas fa-user-plus"></i> Login / Register</a>
+        </span>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="container hero-grid">
+    <div class="hero-content">
+      <div class="hero-eyebrow"><span class="live-dot"></span><span class="eyebrow" style="margin:0;">Build Your Fitness Journey</span></div>
+      <h1>Train With <span class="hl">Purpose</span>,<br>Not Guesswork</h1>
+      <p>PeakPulse builds your weekly training plan from your goal, level and schedule — then tracks every rep of progress along the way.</p>
+      <div class="hero-buttons">
+        <a href="#builder" class="btn-primary"><i class="fas fa-bolt"></i> Build My Plan</a>
+        <a href="#categories" class="btn-outline">Explore Services</a>
+      </div>
+      <div class="hero-proof">
+        <div class="avatar-stack">
+          <span style="background:var(--volt);">JB</span>
+        </div>
+        <div class="proof-text"><strong>Jerin Babu</strong> — Fitness Coach &amp; Transformation Specialist</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="marquee-band">
+  <div class="marquee-track">
+    <span><i class="fas fa-circle"></i>STRENGTH &amp; CONDITIONING<i class="fas fa-circle"></i>WEIGHT MANAGEMENT<i class="fas fa-circle"></i>BODY TRANSFORMATION<i class="fas fa-circle"></i>PERSONAL TRAINING<i class="fas fa-circle"></i>FUNCTIONAL STRENGTH TRAINING</span>
+    <span><i class="fas fa-circle"></i>STRENGTH &amp; CONDITIONING<i class="fas fa-circle"></i>WEIGHT MANAGEMENT<i class="fas fa-circle"></i>BODY TRANSFORMATION<i class="fas fa-circle"></i>PERSONAL TRAINING<i class="fas fa-circle"></i>FUNCTIONAL STRENGTH TRAINING</span>
+  </div>
+</div>
+
+<section class="categories section-padding" id="categories">
+  <div class="container">
+    <div class="text-center reveal">
+      <div class="eyebrow" style="justify-content:center;">Services</div>
+      <h2 class="section-title">What I Offer</h2>
+      <p class="section-subtitle" style="margin:0 auto;">Expert-led training designed to push your limits and deliver results.</p>
+    </div>
+    <div class="category-grid">
+      <div class="category-card reveal"><i class="fas fa-dumbbell"></i><h4>Strength &amp; Conditioning</h4><p>Build raw power and athletic performance</p></div>
+      <div class="category-card reveal"><i class="fas fa-weight-scale"></i><h4>Weight Management</h4><p>Sustainable fat loss and healthy habits</p></div>
+      <div class="category-card reveal"><i class="fas fa-person-running"></i><h4>Body Transformation</h4><p>Complete physical and mental transformation</p></div>
+      <div class="category-card reveal"><i class="fas fa-user-tie"></i><h4>Personal Training</h4><p>1-on-1 coaching tailored to your needs</p></div>
+      <div class="category-card reveal"><i class="fas fa-bolt"></i><h4>Functional Strength</h4><p>Build strength for real-life movements</p></div>
+      <div class="category-card reveal"><i class="fas fa-heart-pulse"></i><h4>Fitness Assessment</h4><p>Complete evaluation and goal setting</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="coaches section-padding" id="coaches">
+  <div class="container">
+    <div class="reveal">
+      <div class="eyebrow">Your Coach</div>
+      <h2 class="section-title">Meet Jerin Babu</h2>
+      <p class="section-subtitle">Click to view full profile</p>
+    </div>
+    <div class="coach-grid" style="max-width:400px; margin:0 auto;">
+      <div class="coach-card reveal" style="text-align:center; cursor:pointer;" id="coachCard">
+        <div class="coach-avatar" style="margin:0 auto 1.1rem;">
+          JB
+        </div>
+        <h4>Jerin Babu</h4>
+        <div class="role" id="typingRole"></div>
+        <div class="bio-text" id="typingBio"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ COACH MODAL ============ -->
+<div class="coach-modal-overlay" id="coachModal">
+  <div class="coach-modal-box">
+    <button class="coach-modal-close" id="coachModalClose"><i class="fas fa-times"></i></button>
+    <div class="coach-modal-content">
+      <div class="coach-modal-image">
+        <span class="badge"><i class="fas fa-star"></i> Certified Coach</span>
+      </div>
+      <div class="coach-modal-info">
+        <div class="avatar-big">JB</div>
+        <h2>Jerin Babu</h2>
+        <div class="modal-role">Fitness Coach &amp; Transformation Specialist</div>
+        <p class="modal-bio">Ex-competitive powerlifter with 5 years of experience helping clients transform their bodies and achieve their fitness goals through personalized training programs.</p>
+        <div class="modal-specs">
+          <div class="spec-item">
+            <div class="label">Experience</div>
+            <div class="value">5+ Years</div>
+          </div>
+          <div class="spec-item">
+            <div class="label">Specialization</div>
+            <div class="value">Strength &amp; Conditioning</div>
+          </div>
+          <div class="spec-item">
+            <div class="label">Certifications</div>
+            <div class="value">Certified Personal Trainer</div>
+          </div>
+          <div class="spec-item">
+            <div class="label">Focus</div>
+            <div class="value">Body Transformation</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="algo section-padding" id="builder">
+  <div class="container">
+    <div class="reveal">
+      <div class="eyebrow">Training Algorithm</div>
+      <h2 class="section-title">Build Your Week</h2>
+      <p class="section-subtitle">Answer four questions. We'll generate a full weekly split with sets, reps and rest — tuned to your goal and equipment.</p>
+    </div>
+
+    <div class="algo-panel reveal">
+      <div class="algo-form">
+        <div class="form-group">
+          <label>Goal</label>
+          <div class="pill-row" id="goalRow">
+            <button class="pill active" data-val="strength">Strength</button>
+            <button class="pill" data-val="fatloss">Fat Loss</button>
+            <button class="pill" data-val="endurance">Endurance</button>
+            <button class="pill" data-val="mobility">Mobility</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Experience Level</label>
+          <div class="pill-row" id="levelRow">
+            <button class="pill active" data-val="beginner">Beginner</button>
+            <button class="pill" data-val="intermediate">Intermediate</button>
+            <button class="pill" data-val="advanced">Advanced</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Equipment</label>
+          <div class="pill-row" id="equipRow">
+            <button class="pill active" data-val="gym">Full Gym</button>
+            <button class="pill" data-val="home">Home / Dumbbells</button>
+            <button class="pill" data-val="bodyweight">Bodyweight Only</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Days Per Week</label>
+          <div class="days-stepper">
+            <button id="daysMinus" type="button" aria-label="Decrease days">–</button>
+            <div class="days-val" id="daysVal">4</div>
+            <button id="daysPlus" type="button" aria-label="Increase days">+</button>
+          </div>
+        </div>
+        <button class="btn-primary" id="generateBtn"><i class="fas fa-wand-magic-sparkles"></i> Generate My Plan</button>
+      </div>
+      <div class="algo-output" id="algoOutput">
+        <div class="output-placeholder locked" id="lockPlaceholder">
+          <i class="fas fa-lock"></i>
+          <p>Subscribe to unlock your personalized weekly split.</p>
+          <p style="font-size:0.8rem;margin-top:0.5rem;"><i class="fas fa-arrow-right" style="color:var(--volt);"></i> Click below to subscribe</p>
+          <button class="btn-primary unlock-btn" id="unlockBtn" type="button"><i class="fas fa-unlock"></i> Subscribe Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pricing section-padding" id="pricing">
+  <div class="container">
+    <div class="text-center reveal">
+      <div class="eyebrow" style="justify-content:center;">Training Plans</div>
+      <h2 class="section-title">Simple, Transparent Pricing</h2>
+      <p class="section-subtitle" style="margin:0 auto;">Choose the plan that fits your goals and schedule.</p>
+    </div>
+    <div class="price-grid">
+      <div class="price-card featured reveal">
+        <h4>Starter Plan</h4>
+        <div class="price" style="display:flex; align-items:baseline; justify-content:center; gap:0.8rem; flex-wrap:wrap;">
+          <span style="font-size:2.8rem;">₹299<span style="font-size:0.9rem; color:var(--text-muted); font-weight:500;">/week</span></span>
+          <span style="color:var(--text-muted); font-size:1.2rem;">or</span>
+          <span style="font-size:2.8rem;">₹699<span style="font-size:0.9rem; color:var(--text-muted); font-weight:500;">/month</span></span>
+        </div>
+        <p class="desc">Everything you need to start your fitness transformation.</p>
+        <ul class="price-list">
+          <li><i class="fas fa-check"></i> Personalized weekly workout plan</li>
+          <li><i class="fas fa-check"></i> Nutrition guidance & food recommendations</li>
+          <li><i class="fas fa-check"></i> Progress tracking & assessments</li>
+          <li><i class="fas fa-check"></i> 1-on-1 coaching support</li>
+          <li><i class="fas fa-check"></i> Mobility & recovery protocols</li>
+          <li><i class="fas fa-check"></i> Accountability check-ins</li>
+        </ul>
+        <button class="btn-primary" id="subscribeBtn" style="width:100%; justify-content:center;"><i class="fas fa-bolt"></i> Get Started</button>
+        <p style="text-align:center; margin-top:0.8rem; color:var(--text-muted); font-size:0.75rem;">No hidden fees. Cancel anytime.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SUBSCRIPTION MODAL ============ -->
+<div class="sub-modal-overlay" id="subModal">
+  <div class="sub-modal-box">
+    <button class="sub-modal-close" id="subModalClose"><i class="fas fa-times"></i></button>
+    <h3 class="sub-modal-title">Choose Your Plan</h3>
+    <p class="sub-modal-sub">Select the subscription that works best for you</p>
+    
+    <div class="sub-plans">
+      <!-- Weekly Plan -->
+      <div class="sub-plan-card" data-plan="weekly" id="weeklyPlan">
+        <div class="plan-badge">Weekly</div>
+        <div class="plan-price">₹299 <span>/week</span></div>
+        <div class="plan-desc">Perfect for short-term commitment</div>
+        <ul class="plan-features">
+          <li><i class="fas fa-check"></i> Full program access</li>
+          <li><i class="fas fa-check"></i> Coach support</li>
+          <li><i class="fas fa-check"></i> Weekly progress review</li>
+        </ul>
+      </div>
+      
+      <!-- Monthly Plan -->
+      <div class="sub-plan-card popular" data-plan="monthly" id="monthlyPlan">
+        <div class="plan-badge">Monthly</div>
+        <div class="plan-price">₹699 <span>/month</span></div>
+        <div class="plan-desc">Best value for long-term results</div>
+        <ul class="plan-features">
+          <li><i class="fas fa-check"></i> All weekly features</li>
+          <li><i class="fas fa-check"></i> 1-on-1 coaching calls</li>
+          <li><i class="fas fa-check"></i> Custom nutrition plan</li>
+          <li><i class="fas fa-check"></i> Priority support</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="sub-modal-actions">
+      <button class="btn-primary" id="proceedPaymentBtn" style="flex:1; justify-content:center;"><i class="fas fa-arrow-right"></i> Proceed to Payment</button>
+    </div>
+    <p style="text-align:center; margin-top:0.8rem; color:var(--text-muted); font-size:0.7rem;">Secure payment. Cancel anytime.</p>
+  </div>
+</div>
+
+<!-- ============ PAYMENT SUCCESS MODAL ============ -->
+<div class="payment-success-overlay" id="paymentSuccess">
+  <div class="payment-success-box">
+    <div class="success-icon"><i class="fas fa-check-circle"></i></div>
+    <h2>Payment Successful!</h2>
+    <p>Thank you for subscribing to PeakPulse.</p>
+    <div class="plan-detail" id="selectedPlanDisplay">Weekly Plan - ₹299</div>
+    <p style="font-size:0.8rem; color:var(--text-muted);">Your fitness journey starts now. Your personalized plan is now unlocked!</p>
+    <br>
+    <button class="btn-primary" id="successContinueBtn" style="width:100%; justify-content:center;"><i class="fas fa-arrow-right"></i> Continue to Dashboard</button>
+  </div>
+</div>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="final-cta">
+  <div class="container">
+    <div class="reveal">
+      <h2>Your First Session Is Free</h2>
+      <p>No card required. Build your plan, try a session, see how it feels.</p>
+      
+      <!-- Free Features Grid -->
+      <div class="free-features-grid">
+        <div class="free-feature-card">
+          <div class="icon available"><i class="fas fa-check-circle"></i></div>
+          <div class="content">
+            <h4>Plan Generator</h4>
+            <p>Personalized weekly workout plan tailored to your goals and schedule.</p>
+          </div>
+        </div>
+        <div class="free-feature-card">
+          <div class="icon available"><i class="fas fa-check-circle"></i></div>
+          <div class="content">
+            <h4>Food Generator</h4>
+            <p>Nutrition recommendations to support your fitness goals and recovery.</p>
+          </div>
+        </div>
+        <div class="free-feature-card">
+          <div class="icon available"><i class="fas fa-check-circle"></i></div>
+          <div class="content">
+            <h4>Things to Do</h4>
+            <p>Actionable daily tasks to keep you on track and build healthy habits.</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Premium Features Notice -->
+      <div class="premium-notice">
+        <p>
+          <span class="label">Premium features (not included in free session):</span>
+          <span class="premium-item"><span class="cross"><i class="fas fa-times-circle"></i></span> Online coaching for clients</span>
+          <span class="premium-item"><span class="cross"><i class="fas fa-times-circle"></i></span> Workout reminders</span>
+          <span class="premium-item"><span class="cross"><i class="fas fa-times-circle"></i></span> Progress tracking</span>
+        </p>
+      </div>
+      
+      <a href="#builder" class="btn-primary"><i class="fas fa-bolt"></i> Get Started</a>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#" class="logo" style="font-size:1.4rem;"><span class="pulse-dot"></span>PEAKPULSE</a>
+        <p>Your partner in peak performance. Strength, conditioning, and transformation.</p>
+      </div>
+      <div class="footer-links"><h5>Explore</h5><a href="#categories">Services</a><a href="#coaches">Coach</a><a href="#builder">Build My Plan</a><a href="#pricing">Pricing</a></div>
+      <div class="footer-links">
+        <h5>Contact</h5>
+        <a href="tel:+919895690857"><i class="fas fa-phone"></i> +91 9895690857</a>
+        <a href="https://wa.me/919895690857?text=Hi%2C%20can%20you%20help%20me%20with%20my%20workout" target="_blank"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+        <a href="https://www.instagram.com/_.j3rry__24?igsh=c2d0MTMzZ2lzYjIw&utm_source=qr" target="_blank"><i class="fab fa-instagram"></i> Instagram</a>
+      </div>
+      <div class="footer-links">
+        <h5>Stay In The Loop</h5>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:0.8rem;">Weekly training tips, no spam.</p>
+        <div class="newsletter"><input type="email" placeholder="you@email.com"><button>Join</button></div>
+      </div>
+    </div>
+    <div class="footer-bottom">&copy; 2026 PeakPulse Fitness. All rights reserved. | Trainer: Jerin Babu</div>
+  </div>
+</footer>
+
+<!-- ============ AUTH MODAL ============ -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal-box">
+    <button class="modal-close-x" id="authModalClose" type="button" aria-label="Close"><i class="fas fa-times"></i></button>
+    <h3 id="authModalTitle"><i class="fas fa-sign-in-alt" style="color:var(--volt);margin-right:8px;"></i>Login</h3>
+    <p class="modal-sub" id="authModalSub">Access your PeakPulse account</p>
+    <form id="authForm" novalidate>
+      <div class="form-group" id="fg-username">
+        <label><i class="fas fa-user" style="margin-right:6px;"></i> Username</label>
+        <input type="text" class="field-input" id="authUsername" placeholder="jordan_lee">
+        <div class="field-error">Please enter your username.</div>
+      </div>
+      <div class="form-group" id="fg-email">
+        <label><i class="fas fa-envelope" style="margin-right:6px;"></i> Email</label>
+        <input type="email" class="field-input" id="authEmail" placeholder="jordan.lee@example.com">
+        <div class="field-error">Please enter your email.</div>
+      </div>
+      <div class="form-group" id="fg-displayname" style="display:none;">
+        <label><i class="fas fa-id-card" style="margin-right:6px;"></i> Display Name</label>
+        <input type="text" class="field-input" id="authDisplayName" placeholder="Jordan Lee">
+        <div class="field-error">Please enter a display name.</div>
+      </div>
+      <div class="form-group" id="fg-password">
+        <label><i class="fas fa-lock" style="margin-right:6px;"></i> Password</label>
+        <input type="password" class="field-input" id="authPassword" placeholder="••••••••">
+        <div class="field-error">Please enter your password.</div>
+      </div>
+      <div class="modal-actions" style="justify-content:space-between; flex-wrap:wrap;">
+        <span style="color:var(--text-muted); font-size:0.85rem;">
+          <span id="authToggleText">Don't have an account?</span>
+          <span class="auth-toggle-link" id="authToggleBtn">Register</span>
+        </span>
+        <button type="submit" class="btn-primary" id="authSubmitBtn"><i class="fas fa-arrow-right"></i> Login</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  SUPABASE CONFIGURATION
+// ============================================================
+const SUPABASE_URL = 'https://yzgbxhavloqhjfdjdorz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6Z2J4aGF2bG9xaGpmZGpkb3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMTUxNTIsImV4cCI6MjA5OTc5MTE1Mn0.SBzYHbp1TLTLEK30PICaXYN1_Xt3P5_K2QVMW-w3604';
+
+// Initialize Supabase
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+console.log('Supabase initialized!');
+
+// ============ GLOBAL STATE ============
+let currentDisplayName = '';
+let selectedPlan = null;
+let isSubscribed = false; // Track if user has paid subscription
+
+// ============ RAZORPAY CONFIGURATION ============
+// IMPORTANT: Replace with your actual Razorpay Key ID from dashboard
+const RAZORPAY_KEY_ID = 'rzp_test_XXXXXXXXXXXXXXXX'; // Replace with your test key
+
+function getPlanDetails(planType) {
+  if (planType === 'weekly') {
+    return {
+      amount: 29900, // in paise (₹299)
+      currency: 'INR',
+      name: 'Weekly Plan',
+      description: 'PeakPulse Weekly Subscription',
+      plan: 'Weekly Plan - ₹299'
+    };
+  } else {
+    return {
+      amount: 69900, // in paise (₹699)
+      currency: 'INR',
+      name: 'Monthly Plan',
+      description: 'PeakPulse Monthly Subscription',
+      plan: 'Monthly Plan - ₹699'
+    };
+  }
+}
+
+function openRazorpayPayment(planType, userEmail, userName) {
+  const plan = getPlanDetails(planType);
+  
+  const options = {
+    key: RAZORPAY_KEY_ID,
+    amount: plan.amount,
+    currency: plan.currency,
+    name: 'PeakPulse Fitness',
+    description: plan.description,
+    image: 'https://peakpulse.com/logo.png', // Replace with your logo URL
+    prefill: {
+      name: userName || 'PeakPulse User',
+      email: userEmail || 'user@example.com',
+      contact: '9895690857'
+    },
+    theme: {
+      color: '#d4ff3f'
+    },
+    modal: {
+      ondismiss: function() {
+        console.log('Payment modal closed');
+      }
+    },
+    handler: function(response) {
+      // Payment successful - unlock the generator
+      console.log('Payment successful:', response);
+      isSubscribed = true;
+      
+      // Save subscription status to localStorage
+      localStorage.setItem('peakpulse_subscribed', 'true');
+      localStorage.setItem('peakpulse_plan', plan.plan);
+      localStorage.setItem('peakpulse_payment_id', response.razorpay_payment_id);
+      
+      // Show success modal
+      showPaymentSuccess(plan.plan);
+      
+      // Unlock the generator
+      profile.complete = true;
+      generatePlan();
+      
+      // Update the UI to show unlocked state
+      document.querySelector('.output-placeholder.locked i').className = 'fas fa-unlock';
+      document.querySelector('.output-placeholder.locked p').textContent = 'Your personalized weekly split is ready!';
+      
+      // Save payment to database
+      savePaymentToDatabase(response, planType, userEmail);
+    }
+  };
+  
+  const rzp = new Razorpay(options);
+  rzp.open();
+}
+
+async function savePaymentToDatabase(paymentResponse, planType, userEmail) {
+  try {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return;
+    
+    // Save subscription status to profiles table
+    const { error } = await supabaseClient
+      .from('profiles')
+      .update({
+        is_subscribed: true,
+        subscription_plan: planType,
+        subscription_start: new Date().toISOString(),
+        payment_id: paymentResponse.razorpay_payment_id
+      })
+      .eq('user_id', user.id);
+      
+    if (error) console.error('Error saving subscription:', error);
+  } catch (error) {
+    console.error('Error saving payment to database:', error);
+  }
+}
+
+function showPaymentSuccess(planName) {
+  const overlay = document.getElementById('paymentSuccess');
+  document.getElementById('selectedPlanDisplay').textContent = planName;
+  overlay.classList.add('open');
+  requestAnimationFrame(() => overlay.classList.add('show'));
+  document.body.style.overflow = 'hidden';
+}
+
+// Check if user already has active subscription
+function checkSubscriptionStatus() {
+  const saved = localStorage.getItem('peakpulse_subscribed');
+  if (saved === 'true') {
+    isSubscribed = true;
+    profile.complete = true;
+    return true;
+  }
+  return false;
+}
+
+// ============ CURSOR GLOW ============ */
+const glow = document.getElementById('cursorGlow');
+const heroEl = document.querySelector('.hero');
+if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+  heroEl.addEventListener('mousemove', (e) => {
+    glow.style.opacity = '1';
+    glow.style.left = e.clientX + 'px';
+    glow.style.top = e.clientY + 'px';
+  });
+  heroEl.addEventListener('mouseleave', () => { glow.style.opacity = '0'; });
+}
+
+/* ============ NAV ============ */
+const navbar = document.getElementById('navbar');
+const navToggle = document.getElementById('navToggle');
+const navLinks = document.getElementById('navLinks');
+window.addEventListener('scroll', () => navbar.classList.toggle('scrolled', window.scrollY > 30));
+navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => navLinks.classList.remove('open')));
+
+/* ============ SCROLL REVEAL ============ */
+const revealEls = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting) {
+      setTimeout(() => entry.target.classList.add('is-visible'), i * 50);
+      io.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.12 });
+revealEls.forEach(el => io.observe(el));
+
+/* ============ TYPING ANIMATION ============ */
+function typeText(element, text, speed = 40) {
+  let index = 0;
+  element.innerHTML = '';
+  const cursorSpan = document.createElement('span');
+  cursorSpan.className = 'cursor-blink';
+  
+  function type() {
+    if (index < text.length) {
+      const char = text.charAt(index);
+      element.innerHTML = text.substring(0, index + 1);
+      const cursor = element.querySelector('.cursor-blink');
+      if (!cursor) {
+        const newCursor = document.createElement('span');
+        newCursor.className = 'cursor-blink';
+        element.appendChild(newCursor);
+      }
+      index++;
+      setTimeout(type, speed);
+    } else {
+      const cursor = element.querySelector('.cursor-blink');
+      if (cursor) cursor.remove();
+    }
+  }
+  
+  const initialCursor = document.createElement('span');
+  initialCursor.className = 'cursor-blink';
+  element.appendChild(initialCursor);
+  
+  setTimeout(type, 500);
+}
+
+// ============ COACH TYPING ANIMATION ============
+function startCoachTyping() {
+  const roleElement = document.getElementById('typingRole');
+  const bioElement = document.getElementById('typingBio');
+  
+  const roleText = 'Fitness Coach & Transformation Specialist';
+  const bioText = 'Ex-competitive powerlifter with 5 years of experience helping clients transform their bodies and achieve their fitness goals through personalized training programs.';
+  
+  typeText(roleElement, roleText, 35);
+  
+  setTimeout(() => {
+    typeText(bioElement, bioText, 30);
+  }, roleText.length * 35 + 800);
+}
+
+// ============ COACH MODAL ============
+const coachModal = document.getElementById('coachModal');
+const coachModalClose = document.getElementById('coachModalClose');
+const coachCard = document.getElementById('coachCard');
+
+function openCoachModal() {
+  coachModal.classList.add('open');
+  requestAnimationFrame(() => coachModal.classList.add('show'));
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCoachModal() {
+  coachModal.classList.remove('show');
+  setTimeout(() => {
+    coachModal.classList.remove('open');
+    document.body.style.overflow = '';
+  }, 400);
+}
+
+coachCard.addEventListener('click', openCoachModal);
+coachModalClose.addEventListener('click', closeCoachModal);
+coachModal.addEventListener('click', (e) => {
+  if (e.target === coachModal) closeCoachModal();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && coachModal.classList.contains('open')) {
+    closeCoachModal();
+  }
+});
+
+// ============ SUBSCRIPTION MODAL ============
+const subModal = document.getElementById('subModal');
+const subModalClose = document.getElementById('subModalClose');
+const subscribeBtn = document.getElementById('subscribeBtn');
+const weeklyPlan = document.getElementById('weeklyPlan');
+const monthlyPlan = document.getElementById('monthlyPlan');
+const proceedPaymentBtn = document.getElementById('proceedPaymentBtn');
+const successContinueBtn = document.getElementById('successContinueBtn');
+
+function openSubModal() {
+  selectedPlan = null;
+  weeklyPlan.classList.remove('selected');
+  monthlyPlan.classList.remove('selected');
+  
+  subModal.classList.add('open');
+  requestAnimationFrame(() => subModal.classList.add('show'));
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSubModal() {
+  subModal.classList.remove('show');
+  setTimeout(() => {
+    subModal.classList.remove('open');
+    document.body.style.overflow = '';
+  }, 400);
+}
+
+subscribeBtn.addEventListener('click', openSubModal);
+subModalClose.addEventListener('click', closeSubModal);
+subModal.addEventListener('click', (e) => {
+  if (e.target === subModal) closeSubModal();
+});
+
+// Plan selection
+weeklyPlan.addEventListener('click', () => {
+  weeklyPlan.classList.remove('selected');
+  monthlyPlan.classList.remove('selected');
+  weeklyPlan.classList.add('selected');
+  selectedPlan = 'weekly';
+});
+
+monthlyPlan.addEventListener('click', () => {
+  weeklyPlan.classList.remove('selected');
+  monthlyPlan.classList.remove('selected');
+  monthlyPlan.classList.add('selected');
+  selectedPlan = 'monthly';
+});
+
+// Proceed to payment
+proceedPaymentBtn.addEventListener('click', () => {
+  if (!selectedPlan) {
+    alert('Please select a plan first!');
+    return;
+  }
+  
+  // Get user info if logged in
+  const userEmail = document.getElementById('authEmail')?.value || 'user@example.com';
+  const userName = document.getElementById('authDisplayName')?.value || 'PeakPulse User';
+  
+  // Close subscription modal
+  closeSubModal();
+  
+  // Open Razorpay payment
+  openRazorpayPayment(selectedPlan, userEmail, userName);
+});
+
+// Success continue button
+successContinueBtn.addEventListener('click', () => {
+  const overlay = document.getElementById('paymentSuccess');
+  overlay.classList.remove('show');
+  setTimeout(() => {
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }, 500);
+  // Redirect to dashboard
+  window.location.href = '#builder';
+});
+
+// Escape key for sub modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && subModal.classList.contains('open')) {
+    closeSubModal();
+  }
+});
+
+/* ============ DATE UTILITIES ============ */
+function getCurrentDayIndex() {
+  const today = new Date();
+  let dayIndex = today.getDay() - 1;
+  if (dayIndex < 0) dayIndex = 6;
+  return dayIndex;
+}
+
+function getFormattedDate() {
+  const today = new Date();
+  const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  return today.toLocaleDateString('en-US', options);
+}
+
+function getDayName(dayIndex) {
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  return days[dayIndex] || 'Monday';
+}
+
+// ============ COMPLETE WORKOUT DATABASE WITH TARGET MUSCLES ============
+const WORKOUT_DB = {
+  'Barbell Bench Press': { muscles: 'Chest, Front Shoulders, Triceps' },
+  'Bent-Over Barbell Row': { muscles: 'Lats, Rhomboids, Traps, Biceps' },
+  'Overhead Shoulder Press': { muscles: 'Shoulders, Triceps' },
+  'Lat Pulldown': { muscles: 'Lats, Biceps' },
+  'Dumbbell Biceps Curl': { muscles: 'Biceps' },
+  'Triceps Rope Pushdown': { muscles: 'Triceps' },
+  'Plank': { muscles: 'Core' },
+  'Barbell Back Squat': { muscles: 'Quadriceps, Glutes, Hamstrings' },
+  'Romanian Deadlift': { muscles: 'Hamstrings, Glutes, Lower Back' },
+  'Leg Press': { muscles: 'Quadriceps, Glutes' },
+  'Walking Lunges': { muscles: 'Quads, Glutes, Hamstrings' },
+  'Leg Curl': { muscles: 'Hamstrings' },
+  'Standing Calf Raise': { muscles: 'Calves' },
+  'Hanging Knee Raise': { muscles: 'Lower Abs, Hip Flexors' },
+  'Treadmill Run': { muscles: 'Legs, Cardiovascular System' },
+  'Rowing Machine': { muscles: 'Back, Legs, Core' },
+  'Mountain Climbers': { muscles: 'Core, Shoulders, Legs' },
+  'Russian Twists': { muscles: 'Obliques' },
+  'Bicycle Crunch': { muscles: 'Abdominals' },
+  'Dead Bug': { muscles: 'Core' },
+  'Side Plank': { muscles: 'Obliques, Core' },
+  'Incline Dumbbell Press': { muscles: 'Upper Chest, Shoulders' },
+  'Flat Dumbbell Press': { muscles: 'Chest, Triceps' },
+  'Shoulder Press': { muscles: 'Deltoids, Triceps' },
+  'Dumbbell Lateral Raise': { muscles: 'Side Deltoids' },
+  'Cable Chest Fly': { muscles: 'Chest' },
+  'Triceps Dips': { muscles: 'Triceps, Lower Chest' },
+  'Overhead Triceps Extension': { muscles: 'Triceps' },
+  'Deadlift': { muscles: 'Glutes, Hamstrings, Back' },
+  'Pull-Up': { muscles: 'Lats, Biceps' },
+  'Assisted Pull-Up': { muscles: 'Lats, Biceps' },
+  'Seated Cable Row': { muscles: 'Middle Back, Rhomboids' },
+  'Single-Arm Dumbbell Row': { muscles: 'Lats, Rear Shoulders' },
+  'Face Pull': { muscles: 'Rear Deltoids, Traps' },
+  'Hammer Curl': { muscles: 'Biceps, Forearms' },
+  'EZ-Bar Curl': { muscles: 'Biceps' },
+  'Kettlebell Swing': { muscles: 'Glutes, Hamstrings, Core' },
+  'Dumbbell Thruster': { muscles: 'Legs, Shoulders' },
+  'Farmer\'s Carry': { muscles: 'Grip, Core, Traps' },
+  'Battle Ropes': { muscles: 'Shoulders, Arms, Core' },
+  'Box Step-Up': { muscles: 'Quads, Glutes' },
+  'Medicine Ball Slam': { muscles: 'Core, Shoulders, Lats' },
+  'Burpees': { muscles: 'Full Body' },
+  'Dynamic Stretching': { muscles: 'Full Body' },
+  'Foam Rolling': { muscles: 'Muscle Recovery' },
+  'Hip Mobility Drills': { muscles: 'Hips, Glutes' },
+  'Shoulder Mobility': { muscles: 'Shoulders' },
+  'Ankle Mobility': { muscles: 'Ankles, Calves' },
+  'Yoga Flow': { muscles: 'Full Body' },
+  'Light Walking': { muscles: 'Cardiovascular Recovery' }
+};
+
+// ============ WORKOUT SPLITS ============
+const SPLITS = {
+  3: [
+    ['Barbell Bench Press', 'Bent-Over Barbell Row', 'Overhead Shoulder Press', 'Plank'],
+    ['Barbell Back Squat', 'Romanian Deadlift', 'Walking Lunges', 'Hanging Knee Raise'],
+    ['Deadlift', 'Pull-Up', 'Kettlebell Swing', 'Burpees']
+  ],
+  4: [
+    ['Barbell Bench Press', 'Lat Pulldown', 'Dumbbell Biceps Curl', 'Triceps Rope Pushdown', 'Plank'],
+    ['Barbell Back Squat', 'Romanian Deadlift', 'Leg Press', 'Standing Calf Raise'],
+    ['Treadmill Run', 'Russian Twists', 'Bicycle Crunch', 'Side Plank'],
+    ['Deadlift', 'Pull-Up', 'Seated Cable Row', 'Face Pull', 'Hammer Curl']
+  ],
+  5: [
+    ['Barbell Bench Press', 'Bent-Over Barbell Row', 'Overhead Shoulder Press', 'Dumbbell Biceps Curl', 'Triceps Rope Pushdown'],
+    ['Barbell Back Squat', 'Romanian Deadlift', 'Leg Press', 'Walking Lunges', 'Standing Calf Raise'],
+    ['Treadmill Run', 'Rowing Machine', 'Mountain Climbers', 'Russian Twists', 'Dead Bug'],
+    ['Incline Dumbbell Press', 'Flat Dumbbell Press', 'Shoulder Press', 'Dumbbell Lateral Raise', 'Triceps Dips'],
+    ['Deadlift', 'Pull-Up', 'Seated Cable Row', 'Single-Arm Dumbbell Row', 'Face Pull', 'Hammer Curl']
+  ],
+  6: [
+    ['Barbell Bench Press', 'Bent-Over Barbell Row', 'Overhead Shoulder Press', 'Dumbbell Biceps Curl', 'Triceps Rope Pushdown'],
+    ['Barbell Back Squat', 'Romanian Deadlift', 'Leg Press', 'Walking Lunges', 'Standing Calf Raise'],
+    ['Treadmill Run', 'Rowing Machine', 'Mountain Climbers', 'Russian Twists', 'Bicycle Crunch', 'Dead Bug'],
+    ['Incline Dumbbell Press', 'Flat Dumbbell Press', 'Shoulder Press', 'Dumbbell Lateral Raise', 'Cable Chest Fly', 'Triceps Dips'],
+    ['Deadlift', 'Pull-Up', 'Seated Cable Row', 'Single-Arm Dumbbell Row', 'Face Pull', 'Hammer Curl', 'EZ-Bar Curl'],
+    ['Kettlebell Swing', 'Dumbbell Thruster', 'Farmer\'s Carry', 'Battle Ropes', 'Box Step-Up', 'Medicine Ball Slam', 'Burpees']
+  ]
+};
+
+const SCHEME = {
+  strength: { sets:'4', reps:'6-8', rest:'2:00', label:'Strength Focus', intensity:'85%' },
+  fatloss: { sets:'3', reps:'15', rest:'0:45', label:'Fat Loss Focus', intensity:'70%' },
+  endurance: { sets:'3', reps:'20', rest:'1:00', label:'Endurance Focus', intensity:'65%' },
+  mobility: { sets:'2', reps:'10 breaths', rest:'0:30', label:'Mobility Focus', intensity:'Low' }
+};
+
+const LEVEL_NOTE = {
+  beginner: 'Focus on form. Start with light weights and gradually increase.',
+  intermediate: 'Push close to failure on last sets. Use progressive overload.',
+  advanced: 'Add intensity techniques: drop sets, supersets, or tempo reps.'
+};
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function getMusclesForExercise(exerciseName) {
+  const cleanName = exerciseName.trim();
+  const found = WORKOUT_DB[cleanName];
+  if (found) return found.muscles;
+  
+  for (const [key, value] of Object.entries(WORKOUT_DB)) {
+    if (cleanName.includes(key) || key.includes(cleanName)) {
+      return value.muscles;
+    }
+  }
+  return 'Various Muscles';
+}
+
+function getDayLabel(dayIndex) {
+  const labels = [
+    'Upper Body Strength',
+    'Lower Body Strength',
+    'Cardio & Core',
+    'Push Workout',
+    'Pull Workout',
+    'Full Body Functional',
+    'Active Recovery & Mobility'
+  ];
+  return labels[dayIndex] || 'Workout Day';
+}
+
+/* ============ WORKOUT STATE ============ */
+const state = { goal: 'strength', level: 'beginner', equipment: 'gym', days: 4 };
+const profile = { complete: false, name: '', username: '' };
+
+function wirePillRow(rowId, key, targetObj) {
+  document.getElementById(rowId).addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill');
+    if (!btn) return;
+    document.querySelectorAll(`#${rowId} .pill`).forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    targetObj[key] = btn.dataset.val;
+    if (targetObj === state && profile.complete) generatePlan();
+  });
+}
+wirePillRow('goalRow', 'goal', state);
+wirePillRow('levelRow', 'level', state);
+wirePillRow('equipRow', 'equipment', state);
+
+const daysVal = document.getElementById('daysVal');
+document.getElementById('daysMinus').addEventListener('click', () => {
+  state.days = Math.max(3, state.days - 1);
+  daysVal.textContent = state.days;
+  if (profile.complete) generatePlan();
+});
+document.getElementById('daysPlus').addEventListener('click', () => {
+  state.days = Math.min(6, state.days + 1);
+  daysVal.textContent = state.days;
+  if (profile.complete) generatePlan();
+});
+
+// ============ SUPABASE FUNCTIONS ============
+async function saveUserData(userId, data) {
+  try {
+    if (data.profile) {
+      const { error } = await supabaseClient
+        .from('profiles')
+        .upsert({
+          user_id: userId,
+          username: data.profile.username,
+          name: data.profile.name || data.profile.display_name,
+          goal: data.profile.goal || 'strength',
+          experience_level: data.profile.level || 'beginner',
+          equipment: data.profile.equipment || 'gym'
+        }, { onConflict: 'user_id' });
+      if (error) console.error('Error saving profile:', error);
+    }
+
+    if (data.plan) {
+      const { error } = await supabaseClient
+        .from('workout_plans')
+        .upsert({
+          user_id: userId,
+          goal: data.plan.goal,
+          days: data.plan.days,
+          equipment: data.plan.equipment,
+          experience_level: data.plan.level,
+          exercises: data.plan.exercises
+        }, { onConflict: 'user_id' });
+      if (error) console.error('Error saving plan:', error);
+    }
+
+    if (data.progress) {
+      const { error } = await supabaseClient
+        .from('progress')
+        .upsert({
+          user_id: userId,
+          weekly_done: data.progress.weeklyDone || 0,
+          streak: data.progress.streak || 0,
+          total_sessions: data.progress.total || 0,
+          week_minutes: data.progress.week || [0,0,0,0,0,0,0]
+        }, { onConflict: 'user_id' });
+      if (error) console.error('Error saving progress:', error);
+    }
+
+    if (data.checklist) {
+      for (const [key, completed] of Object.entries(data.checklist)) {
+        const { error } = await supabaseClient
+          .from('checklists')
+          .upsert({
+            user_id: userId,
+            exercise_key: key,
+            completed: completed,
+            completed_at: completed ? new Date().toISOString() : null
+          }, { onConflict: 'user_id, exercise_key' });
+        if (error) console.error('Error saving checklist:', error);
+      }
+    }
+  } catch (error) {
+    console.error('Error saving user data:', error);
+  }
+}
+
+async function loadUserData(userId) {
+  try {
+    const { data: profileData, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (profileError) {
+      console.error('Error loading profile:', profileError);
+    }
+
+    const { data: planData, error: planError } = await supabaseClient
+      .from('workout_plans')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: progressData, error: progressError } = await supabaseClient
+      .from('progress')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const { data: checklistData, error: checklistError } = await supabaseClient
+      .from('checklists')
+      .select('*')
+      .eq('user_id', userId);
+
+    const checklist = {};
+    if (checklistData) {
+      checklistData.forEach(item => {
+        checklist[item.exercise_key] = item.completed;
+      });
+    }
+
+    return {
+      profile: profileData || { name: 'you', username: 'you', goal: 'strength', experience_level: 'beginner' },
+      plan: planData || null,
+      progress: progressData ? {
+        weeklyDone: progressData.weekly_done || 0,
+        streak: progressData.streak || 0,
+        total: progressData.total_sessions || 0,
+        week: progressData.week_minutes || [0,0,0,0,0,0,0]
+      } : null,
+      checklist: checklist
+    };
+  } catch (error) {
+    console.error('Error loading user data:', error);
+    return null;
+  }
+}
+
+// ============ UPDATE NAV WITH USER ============
+function updateNavWithUser(displayName) {
+  const authContainer = document.getElementById('authNavContainer');
+  if (displayName && displayName !== 'you' && displayName !== '') {
+    authContainer.innerHTML = `
+      <div class="user-greeting">
+        <i class="fas fa-user-circle"></i>
+        <span>${displayName}</span>
+        <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    `;
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        await supabaseClient.auth.signOut();
+        currentDisplayName = '';
+        updateNavWithUser(null);
+        location.reload();
+      });
+    }
+  } else {
+    authContainer.innerHTML = `<a href="#" class="nav-cta" id="authNavBtn"><i class="fas fa-user-plus"></i> Login / Register</a>`;
+    const authBtn = document.getElementById('authNavBtn');
+    if (authBtn) {
+      authBtn.addEventListener('click', (e) => { e.preventDefault(); openAuthModal(); });
+    }
+  }
+}
+
+// ============ AUTH FUNCTIONS ============
+const authModal = document.getElementById('authModal');
+const authForm = document.getElementById('authForm');
+let isLoginMode = true;
+
+function openAuthModal() {
+  console.log('Opening auth modal');
+  authModal.classList.add('open');
+  setTimeout(() => authModal.classList.add('show'), 50);
+}
+function closeAuthModal() {
+  authModal.classList.remove('show');
+  setTimeout(() => authModal.classList.remove('open'), 250);
+}
+
+document.getElementById('authModalClose').addEventListener('click', closeAuthModal);
+authModal.addEventListener('click', (e) => { if (e.target === authModal) closeAuthModal(); });
+
+document.getElementById('authToggleBtn').addEventListener('click', () => {
+  isLoginMode = !isLoginMode;
+  const title = document.getElementById('authModalTitle');
+  const sub = document.getElementById('authModalSub');
+  const submitBtn = document.getElementById('authSubmitBtn');
+  const toggleText = document.getElementById('authToggleText');
+  const displayNameField = document.getElementById('fg-displayname');
+  const emailField = document.getElementById('fg-email');
+  
+  if (isLoginMode) {
+    title.innerHTML = '<i class="fas fa-sign-in-alt" style="color:var(--volt);margin-right:8px;"></i>Login';
+    sub.textContent = 'Access your PeakPulse account';
+    submitBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Login';
+    toggleText.textContent = "Don't have an account?";
+    document.getElementById('authToggleBtn').textContent = 'Register';
+    displayNameField.style.display = 'none';
+    emailField.style.display = 'none';
+  } else {
+    title.innerHTML = '<i class="fas fa-user-plus" style="color:var(--volt);margin-right:8px;"></i>Register';
+    sub.textContent = 'Create your PeakPulse account';
+    submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Register';
+    toggleText.textContent = 'Already have an account?';
+    document.getElementById('authToggleBtn').textContent = 'Login';
+    displayNameField.style.display = 'block';
+    emailField.style.display = 'block';
+  }
+});
+
+authForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('authUsername').value.trim();
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value.trim();
+  const displayName = document.getElementById('authDisplayName').value.trim();
+  
+  const fgUser = document.getElementById('fg-username');
+  const fgEmail = document.getElementById('fg-email');
+  const fgPass = document.getElementById('fg-password');
+  const fgDisplay = document.getElementById('fg-displayname');
+  
+  let valid = true;
+  if (!username) { fgUser.classList.add('invalid'); valid = false; } else { fgUser.classList.remove('invalid'); }
+  if (!isLoginMode && !email) { fgEmail.classList.add('invalid'); valid = false; } else { fgEmail.classList.remove('invalid'); }
+  if (!password) { fgPass.classList.add('invalid'); valid = false; } else { fgPass.classList.remove('invalid'); }
+  
+  if (!isLoginMode && !displayName) { 
+    fgDisplay.classList.add('invalid'); 
+    valid = false; 
+  } else { 
+    fgDisplay.classList.remove('invalid'); 
+  }
+  
+  if (!valid) return;
+
+  try {
+    if (isLoginMode) {
+      const loginInput = email || username;
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: loginInput,
+        password: password
+      });
+      if (error) throw error;
+      alert('Login successful! Welcome back.');
+      closeAuthModal();
+      await loadUserDataFromSupabase(data.user.id);
+    } else {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: { 
+            username: username,
+            display_name: displayName
+          }
+        }
+      });
+      if (error) throw error;
+      
+      if (data.user) {
+        const { data: existingProfile } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
+        
+        if (!existingProfile) {
+          await saveUserData(data.user.id, {
+            profile: { 
+              username: username,
+              name: displayName,
+              display_name: displayName,
+              goal: 'strength',
+              level: 'beginner',
+              equipment: 'gym'
+            }
+          });
+        }
+      }
+      
+      alert('Account created! You are now logged in.');
+      closeAuthModal();
+      await loadUserDataFromSupabase(data.user.id);
+    }
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
+async function loadUserDataFromSupabase(userId) {
+  const userData = await loadUserData(userId);
+  if (!userData) {
+    profile.complete = false;
+    renderLockedPlaceholder();
+    renderChecklist([]);
+    updateNavWithUser(null);
+    return;
+  }
+
+  profile.complete = true;
+  profile.name = userData.profile?.name || userData.profile?.display_name || 'you';
+  profile.username = userData.profile?.username || '';
+  
+  currentDisplayName = profile.name;
+  updateNavWithUser(currentDisplayName);
+  
+  // Check if user has active subscription from database
+  if (userData.profile?.is_subscribed) {
+    isSubscribed = true;
+    localStorage.setItem('peakpulse_subscribed', 'true');
+    profile.complete = true;
+  }
+  
+  if (userData.plan) {
+    state.goal = userData.plan.goal || 'strength';
+    state.level = userData.plan.experience_level || 'beginner';
+    state.equipment = userData.plan.equipment || 'gym';
+    state.days = userData.plan.days || 4;
+    daysVal.textContent = state.days;
+    document.querySelectorAll('#goalRow .pill').forEach(p => p.classList.toggle('active', p.dataset.val === state.goal));
+    document.querySelectorAll('#levelRow .pill').forEach(p => p.classList.toggle('active', p.dataset.val === state.level));
+    document.querySelectorAll('#equipRow .pill').forEach(p => p.classList.toggle('active', p.dataset.val === state.equipment));
+    state.currentPlan = userData.plan;
+  } else {
+    state.currentPlan = null;
+  }
+
+  // If subscribed or has plan, generate plan
+  if (isSubscribed || profile.complete) {
+    generatePlan();
+  } else {
+    renderLockedPlaceholder();
+  }
+  renderChecklist(userData.checklist || {});
+}
+
+function renderLockedPlaceholder() {
+  const output = document.getElementById('algoOutput');
+  if (!output) return;
+  output.innerHTML = `
+    <div class="output-placeholder locked" id="lockPlaceholder">
+      <i class="fas fa-lock"></i>
+      <p>Subscribe to unlock your personalized weekly split.</p>
+      <p style="font-size:0.8rem;margin-top:0.5rem;"><i class="fas fa-arrow-right" style="color:var(--volt);"></i> Click below to subscribe</p>
+      <button class="btn-primary unlock-btn" id="unlockBtn" type="button"><i class="fas fa-unlock"></i> Subscribe Now</button>
+    </div>
+  `;
+  const unlockBtn = document.getElementById('unlockBtn');
+  if (unlockBtn) unlockBtn.addEventListener('click', () => {
+    // Open subscription modal
+    openSubModal();
+  });
+}
+
+// ============ GENERATE PLAN ============
+async function generatePlan() {
+  if (!isSubscribed && !profile.complete) {
+    renderLockedPlaceholder();
+    return;
+  }
+
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (!user) { renderLockedPlaceholder(); return; }
+
+  const split = SPLITS[state.days];
+  if (!split) {
+    const output = document.getElementById('algoOutput');
+    if (output) output.innerHTML = '<div class="output-placeholder"><i class="fas fa-exclamation-triangle"></i><p>Invalid days selection. Please choose 3-6 days.</p></div>';
+    return;
+  }
+  const scheme = state.goal === 'mobility' ? SCHEME.mobility : SCHEME[state.goal];
+  const output = document.getElementById('algoOutput');
+  if (!output) return;
+
+  const exercises = [];
+  const currentDayIndex = getCurrentDayIndex();
+  const formattedDate = getFormattedDate();
+  const todayDayName = getDayName(currentDayIndex);
+  
+  let html = `
+    <div class="plan-header">
+      <h3><i class="fas fa-calendar-week" style="color:var(--volt);margin-right:8px;"></i> ${state.days}-Day ${capitalize(state.goal)} Split</h3>
+      <span class="tag"><i class="fas fa-tag"></i> ${capitalize(state.level)} · ${capitalize(state.equipment)}</span>
+    </div>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;"><i class="fas fa-user" style="color:var(--volt);margin-right:6px;"></i>Built for ${profile.name}</p>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1.2rem;font-size:0.85rem;color:var(--text-secondary);background:var(--bg-card);padding:0.8rem 1.2rem;border-radius:0.8rem;border:1px solid var(--border);">
+      <span><i class="fas fa-calendar-day" style="color:var(--volt);"></i> ${formattedDate}</span>
+      <span><i class="fas fa-clock" style="color:var(--volt);"></i> Today is <strong style="color:var(--text-primary);">${todayDayName}</strong></span>
+      <span><i class="fas fa-dumbbell" style="color:var(--volt);"></i> ${scheme.sets} sets</span>
+      <span><i class="fas fa-repeat" style="color:var(--volt);"></i> ${scheme.reps} reps</span>
+      <span><i class="fas fa-clock" style="color:var(--volt);"></i> Rest: ${scheme.rest}</span>
+    </div>
+  `;
+
+  split.forEach((patterns, i) => {
+    const dayLabel = getDayLabel(i);
+    const dayEx = [];
+    patterns.forEach((exName) => {
+      const muscles = getMusclesForExercise(exName);
+      const schemeStr = `${scheme.sets} × ${scheme.reps} · rest ${scheme.rest}`;
+      dayEx.push({ name: exName, scheme: schemeStr, muscles: muscles });
+    });
+    exercises.push({ day: DAY_NAMES[i], label: dayLabel, exercises: dayEx });
+
+    const exRows = dayEx.map(ex => `
+      <div class="exercise-row">
+        <span class="ex-name"><i class="fas fa-dumbbell" style="color:var(--volt);font-size:0.7rem;margin-right:8px;"></i>${ex.name}</span>
+        <span class="ex-muscles">🎯 ${ex.muscles}</span>
+        <span class="ex-scheme">${ex.scheme}</span>
+      </div>
+    `).join('');
+
+    const isToday = DAY_NAMES[i] === todayDayName;
+    html += `<div class="day-card" style="animation-delay:${i * 0.08}s;${isToday ? 'border-color:var(--volt);background:var(--volt-dim);' : ''}">
+      <div class="day-title">
+        <strong><i class="fas fa-sun" style="color:var(--volt);font-size:0.8rem;margin-right:6px;"></i>${DAY_NAMES[i]} - ${dayLabel} ${isToday ? '👈 Today' : ''}</strong>
+        <span>${scheme.label}</span>
+      </div>
+      ${exRows}
+    </div>`;
+  });
+
+  html += `<p style="font-size:0.85rem;color:var(--text-muted);margin-top:1rem;line-height:1.6;"><i class="fas fa-circle-info" style="color:var(--volt);margin-right:6px;"></i>${LEVEL_NOTE[state.level]}</p>`;
+  output.innerHTML = html;
+
+  state.currentPlan = { goal: state.goal, level: state.level, equipment: state.equipment, days: state.days, exercises };
+
+  await saveUserData(user.id, {
+    profile: { username: profile.username, name: profile.name, display_name: profile.name, goal: state.goal, level: state.level, equipment: state.equipment },
+    plan: state.currentPlan
+  });
+
+  const userData = await loadUserData(user.id);
+  renderChecklist(userData?.checklist || {});
+}
+
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ============ CHECKLIST ============
+function renderChecklist(checklist) {
+  const container = document.getElementById('checklistContainer');
+  if (!container) return;
+  const plan = state.currentPlan;
+  if (!plan || !plan.exercises) {
+    container.innerHTML = `<p style="color:var(--text-muted);font-size:0.9rem;">Generate a workout plan to track your progress.</p>`;
+    return;
+  }
+
+  const currentDayIndex = getCurrentDayIndex();
+  const todayDayName = getDayName(currentDayIndex);
+  const dayLabel = getDayLabel(currentDayIndex);
+  
+  let html = `<h5><i class="fas fa-list-check" style="margin-right:6px;"></i> ${todayDayName} - ${dayLabel}</h5>`;
+  const dayData = plan.exercises[currentDayIndex] || plan.exercises[0];
+
+  dayData.exercises.forEach((ex) => {
+    const key = `${dayData.day}_${ex.name}`;
+    const done = checklist[key] || false;
+    html += `
+      <div class="checklist-item ${done ? 'done' : ''}" data-key="${key}">
+        <input type="checkbox" ${done ? 'checked' : ''} data-key="${key}">
+        <span class="ex-name">${ex.name}</span>
+        <span class="ex-muscles">🎯 ${ex.muscles}</span>
+        <span class="ex-scheme">${ex.scheme}</span>
+      </div>
+    `;
+  });
+
+  html += `<button class="btn-primary checklist-save-btn" id="saveChecklistBtn"><i class="fas fa-save"></i> Save Progress</button>`;
+  container.innerHTML = html;
+
+  container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', function() {
+      const key = this.dataset.key;
+      const item = this.closest('.checklist-item');
+      if (this.checked) item.classList.add('done');
+      else item.classList.remove('done');
+    });
+  });
+
+  const saveBtn = document.getElementById('saveChecklistBtn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async function() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+
+      const checklistData = {};
+      container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        checklistData[cb.dataset.key] = cb.checked;
+      });
+
+      await saveUserData(user.id, { checklist: checklistData });
+      alert('Progress saved!');
+    });
+  }
+}
+
+// ============ INIT ============
+document.getElementById('generateBtn').addEventListener('click', () => {
+  if (!isSubscribed && !profile.complete) {
+    openSubModal();
+  } else {
+    generatePlan();
+  }
+});
+
+// Override unlock button to open subscription modal
+document.addEventListener('click', function(e) {
+  if (e.target.id === 'unlockBtn' || e.target.closest('#unlockBtn')) {
+    openSubModal();
+  }
+});
+
+window.addEventListener('load', async () => {
+  // Check if user already has subscription from localStorage
+  if (checkSubscriptionStatus()) {
+    profile.complete = true;
+  }
+  
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (user) {
+    await loadUserDataFromSupabase(user.id);
+  } else {
+    // Check localStorage for subscription
+    if (isSubscribed) {
+      profile.complete = true;
+      generatePlan();
+    } else {
+      renderLockedPlaceholder();
+      state.currentPlan = null;
+      updateNavWithUser(null);
+      setTimeout(() => openAuthModal(), 800);
+    }
+  }
+  
+  // Start the typing animation after page loads
+  setTimeout(startCoachTyping, 1000);
+});
+</script>
+</body>
+</html>
+<!-- Login enforcement patch placeholder added by ChatGPT. -->
+<script>
+// Please integrate requireLogin() around Get Started and Proceed to Payment handlers.
+</script>
