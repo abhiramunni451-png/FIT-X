@@ -9,11 +9,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-<!-- Razorpay SDK -->
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- QRCode.js for proper QR generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<!-- EmailJS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
 <style>
 /* ============ RESET ============ */
@@ -40,6 +43,7 @@ html { scroll-behavior:smooth; }
   --radius:1.1rem;
   --green:#4ade80;
   --red:#f87171;
+  --yellow:#fbbf24;
 }
 
 body{
@@ -102,6 +106,7 @@ body{
 .btn-primary{ background:var(--volt); color:#08090a; box-shadow:0 8px 24px rgba(212,255,63,0.18); }
 .btn-primary:hover{ transform:translateY(-3px); box-shadow:0 14px 32px rgba(212,255,63,0.3); background:#e2ff6e; }
 .btn-primary:active{ transform:translateY(-1px); }
+.btn-primary:disabled{ opacity:0.5; cursor:not-allowed; transform:none !important; }
 .btn-outline{ background:transparent; color:var(--text-primary); border-color:var(--border-hover); }
 .btn-outline:hover{ border-color:var(--volt); color:var(--volt); transform:translateY(-2px); }
 
@@ -463,6 +468,23 @@ body{
   box-shadow:var(--shadow-lg);
 }
 .algo-form{ padding:2.6rem; border-right:1px solid var(--border); }
+.algo-form.locked{ opacity:0.5; pointer-events:none; position:relative; }
+.algo-form.locked::after{
+  content:'🔒 SUBSCRIBE TO UNLOCK';
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(7,8,10,0.85);
+  border-radius:1.4rem 0 0 1.4rem;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.8rem;
+  letter-spacing:0.05em;
+  color:var(--volt);
+  z-index:10;
+  backdrop-filter:blur(4px);
+}
 .form-group{ margin-bottom:1.7rem; }
 .form-group label{
   display:block; font-family:'JetBrains Mono',monospace; font-size:0.75rem; text-transform:uppercase;
@@ -567,79 +589,312 @@ body{
 .price-list li i{ color:var(--volt); font-size:0.8rem; }
 .price-card .btn-primary, .price-card .btn-outline{ width:100%; justify-content:center; }
 
-/* ============ FINAL CTA ============ */
-.final-cta{
-  padding:5.5rem 0; text-align:center; position:relative; overflow:hidden;
-  background:radial-gradient(ellipse 700px 400px at 50% 0%, rgba(212,255,63,0.1), transparent 65%), var(--bg-section);
-  border-bottom:1px solid var(--border);
+/* ============ UPI PAYMENT MODAL ============ */
+.upi-modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(4,5,6,0.92);
+  backdrop-filter:blur(12px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:2000;
+  padding:1.5rem;
+  opacity:0;
+  transition:opacity 0.4s ease;
 }
-.final-cta h2{ font-family:'Bebas Neue',sans-serif; font-size:3.4rem; text-transform:uppercase; margin-bottom:1rem; }
-.final-cta p{ color:var(--text-secondary); max-width:480px; margin:0 auto 2.2rem; }
+.upi-modal-overlay.open{ display:flex; }
+.upi-modal-overlay.show{ opacity:1; }
 
-/* Free Session Features */
-.free-features-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
-  gap:1.2rem;
-  max-width:750px;
-  margin:1.8rem auto 2rem;
-  text-align:left;
+.upi-modal-box{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:1.5rem;
+  max-width:520px;
+  width:100%;
+  max-height:90vh;
+  overflow-y:auto;
+  padding:2.5rem;
+  box-shadow:var(--shadow-lg);
+  transform:translateY(30px) scale(0.95);
+  transition:transform 0.4s cubic-bezier(.2,.7,.2,1);
+  position:relative;
 }
-.free-feature-card{
-  background:rgba(17,20,23,0.5);
+.upi-modal-overlay.show .upi-modal-box{
+  transform:translateY(0) scale(1);
+}
+.upi-modal-close{
+  position:absolute;
+  top:1.2rem;
+  right:1.4rem;
+  background:rgba(255,255,255,0.05);
+  border:none;
+  color:var(--text-muted);
+  font-size:1.2rem;
+  cursor:pointer;
+  transition:all 0.3s ease;
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.upi-modal-close:hover{
+  background:rgba(255,255,255,0.1);
+  color:var(--text-primary);
+  transform:rotate(90deg);
+}
+.upi-modal-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.8rem;
+  text-transform:uppercase;
+  color:var(--text-primary);
+  margin-bottom:0.3rem;
+  text-align:center;
+}
+.upi-modal-sub{
+  color:var(--text-secondary);
+  font-size:0.9rem;
+  text-align:center;
+  margin-bottom:1.5rem;
+}
+
+/* UPI QR Section */
+.upi-qr-container{
+  background:var(--bg-body);
+  border:1px solid var(--border);
+  border-radius:1rem;
+  padding:2rem;
+  text-align:center;
+  margin-bottom:1.5rem;
+}
+.upi-qr-container #upiQRContainer{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:220px;
+}
+.upi-qr-container canvas{
+  background:white;
+  border-radius:0.5rem;
+  padding:0.5rem;
+  max-width:220px;
+  max-height:220px;
+}
+.upi-details{
+  margin-top:1rem;
+}
+.upi-details .upi-id{
+  font-family:'JetBrains Mono',monospace;
+  font-size:1.1rem;
+  color:var(--volt);
+  background:var(--volt-dim);
+  padding:0.3rem 1rem;
+  border-radius:60px;
+  display:inline-block;
+}
+.upi-details .upi-amount{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.6rem;
+  color:var(--text-primary);
+  margin-top:0.5rem;
+}
+
+/* Transaction ID Input */
+.transaction-section{
+  margin:1.5rem 0;
+}
+.transaction-section label{
+  display:block;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.75rem;
+  text-transform:uppercase;
+  letter-spacing:0.08em;
+  color:var(--text-muted);
+  margin-bottom:0.5rem;
+}
+.transaction-input-group{
+  display:flex;
+  gap:0.6rem;
+}
+.transaction-input-group input{
+  flex:1;
+  padding:0.8rem 1rem;
+  border-radius:0.7rem;
+  border:1.5px solid var(--border-hover);
+  background:var(--bg-body);
+  color:var(--text-primary);
+  font-family:'Inter',sans-serif;
+  font-size:0.92rem;
+}
+.transaction-input-group input:focus{
+  outline:none;
+  border-color:var(--volt);
+}
+.transaction-input-group .btn-primary{
+  padding:0.8rem 1.5rem;
+}
+
+/* OTP Section */
+.otp-section {
+  margin:1.5rem 0;
+  padding:1rem;
   border:1px solid var(--border);
   border-radius:0.8rem;
-  padding:1.2rem 1.2rem;
-  transition:border-color 0.3s ease, transform 0.3s ease;
-  display:flex;
-  align-items:flex-start;
-  gap:0.8rem;
+  background:var(--bg-body);
+  display:none;
 }
-.free-feature-card:hover{
-  border-color:var(--volt);
-  transform:translateY(-3px);
-}
-.free-feature-card .icon{ font-size:1.3rem; flex-shrink:0; margin-top:2px; }
-.free-feature-card .icon.available{ color:var(--green); }
-.free-feature-card .icon.not-available{ color:var(--red); }
-.free-feature-card .content h4{
-  color:var(--text-primary);
-  font-size:0.9rem;
-  margin-bottom:0.15rem;
-}
-.free-feature-card .content p{
+.otp-section label {
+  display:block;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.75rem;
+  text-transform:uppercase;
+  letter-spacing:0.08em;
   color:var(--text-muted);
-  font-size:0.78rem;
-  line-height:1.4;
+  margin-bottom:0.5rem;
 }
-
-/* Premium Features (not included) */
-.premium-notice{
-  max-width:600px;
-  margin:0 auto 2.2rem;
-  padding:1rem 1.5rem;
-  background:rgba(255,93,93,0.05);
-  border:1px solid rgba(255,93,93,0.15);
-  border-radius:0.8rem;
+.otp-input-group {
+  display:flex;
+  gap:0.6rem;
+  align-items:center;
+  flex-wrap:wrap;
 }
-.premium-notice p{
+.otp-input-group input {
+  flex:1;
+  padding:0.8rem 1rem;
+  border-radius:0.7rem;
+  border:1.5px solid var(--border-hover);
+  background:var(--bg-body);
+  color:var(--text-primary);
+  font-family:'Inter',sans-serif;
+  font-size:1.2rem;
+  text-align:center;
+  letter-spacing:4px;
+  min-width:120px;
+}
+.otp-input-group input:focus {
+  outline:none;
+  border-color:var(--volt);
+}
+.otp-input-group .btn-primary {
+  padding:0.8rem 1.5rem;
+  white-space:nowrap;
+}
+.otp-timer {
   color:var(--text-muted);
   font-size:0.8rem;
+  margin-top:0.5rem;
   text-align:center;
-  line-height:1.8;
 }
-.premium-notice .premium-item{
-  display:inline-block;
-  margin:0 0.5rem;
-}
-.premium-notice .premium-item .cross{
-  color:var(--red);
-  margin-right:4px;
-}
-.premium-notice .label{
-  color:var(--text-secondary);
+.otp-timer .resend-btn {
+  color:var(--volt);
+  cursor:pointer;
+  text-decoration:underline;
   font-weight:600;
 }
+.otp-timer .resend-btn:hover {
+  color:var(--text-primary);
+}
+.otp-status {
+  margin-top:0.5rem;
+  padding:0.5rem 1rem;
+  border-radius:0.5rem;
+  font-size:0.85rem;
+  display:none;
+}
+.otp-status.visible { display:block; }
+.otp-status.success {
+  background:rgba(74,222,128,0.1);
+  border:1px solid var(--green);
+  color:var(--green);
+}
+.otp-status.error {
+  background:rgba(248,113,113,0.1);
+  border:1px solid var(--red);
+  color:var(--red);
+}
+.otp-status.pending {
+  background:rgba(251,191,36,0.1);
+  border:1px solid var(--yellow);
+  color:var(--yellow);
+}
+
+/* Verification Status */
+.verification-status{
+  margin-top:1.5rem;
+  padding:1rem;
+  border-radius:0.8rem;
+  border:1px solid var(--border);
+  display:none;
+}
+.verification-status.visible{ display:block; }
+.verification-status.pending{
+  border-color:var(--yellow);
+  background:rgba(251,191,36,0.08);
+}
+.verification-status.success{
+  border-color:var(--green);
+  background:rgba(74,222,128,0.08);
+}
+.verification-status.failed{
+  border-color:var(--red);
+  background:rgba(248,113,113,0.08);
+}
+.verification-status .status-icon{ font-size:1.5rem; margin-right:0.5rem; }
+.verification-status .status-text{ font-weight:500; }
+.verification-status .status-detail{ font-size:0.85rem; color:var(--text-muted); margin-top:0.3rem; }
+
+/* Progress bar for verification */
+.progress-bar{
+  width:100%;
+  height:4px;
+  background:var(--border-hover);
+  border-radius:4px;
+  margin-top:0.8rem;
+  overflow:hidden;
+  display:none;
+}
+.progress-bar.visible{ display:block; }
+.progress-bar .progress-fill{
+  height:100%;
+  background:var(--volt);
+  border-radius:4px;
+  width:0%;
+  transition:width 0.5s ease;
+  animation:progress 4s ease-in-out infinite;
+}
+@keyframes progress{
+  0%{ width:0%; }
+  50%{ width:70%; }
+  100%{ width:100%; }
+}
+
+/* UPI Apps Grid */
+.upi-apps{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:0.6rem;
+  margin:1.2rem 0;
+}
+.upi-app-btn{
+  padding:0.6rem 0.4rem;
+  background:var(--bg-body);
+  border:1px solid var(--border-hover);
+  border-radius:0.6rem;
+  color:var(--text-secondary);
+  font-size:0.7rem;
+  cursor:pointer;
+  transition:all 0.2s ease;
+  text-align:center;
+  font-family:'Inter',sans-serif;
+}
+.upi-app-btn:hover{
+  border-color:var(--volt);
+  color:var(--text-primary);
+  transform:translateY(-2px);
+}
+.upi-app-btn i{ font-size:1.2rem; display:block; margin-bottom:0.3rem; }
 
 /* ============ SUBSCRIPTION MODAL ============ */
 .sub-modal-overlay{
@@ -650,7 +905,7 @@ body{
   display:none;
   align-items:center;
   justify-content:center;
-  z-index:2000;
+  z-index:1500;
   padding:2rem;
   opacity:0;
   transition:opacity 0.4s ease;
@@ -781,7 +1036,6 @@ body{
   opacity:0.5;
 }
 
-/* Popular badge */
 .sub-plan-card.popular{
   border-color:rgba(212,255,63,0.3);
 }
@@ -809,7 +1063,6 @@ body{
   opacity:0.5;
 }
 
-/* Selected state */
 .sub-plan-card.selected{
   border-color:var(--volt);
   box-shadow:0 0 40px rgba(212,255,63,0.2);
@@ -865,7 +1118,7 @@ body{
   justify-content:center;
 }
 
-/* Payment Success Modal */
+/* ============ PAYMENT SUCCESS MODAL ============ */
 .payment-success-overlay{
   position:fixed;
   inset:0;
@@ -978,6 +1231,46 @@ body{
 .auth-toggle-link{ color:var(--volt); cursor:pointer; font-weight:600; }
 .auth-toggle-link:hover{ text-decoration:underline; }
 
+/* ============ TOAST NOTIFICATIONS ============ */
+.toast-container{
+  position:fixed;
+  top:80px;
+  right:20px;
+  z-index:9999;
+  display:flex;
+  flex-direction:column;
+  gap:0.5rem;
+  max-width:400px;
+}
+.toast{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  color:var(--text-primary);
+  padding:1rem 1.5rem;
+  border-radius:12px;
+  font-weight:500;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  animation:slideIn 0.3s ease;
+  font-family:'Inter',sans-serif;
+  display:flex;
+  align-items:center;
+  gap:0.8rem;
+}
+.toast.success{ border-color:var(--green); }
+.toast.error{ border-color:var(--red); }
+.toast.warning{ border-color:var(--yellow); }
+.toast.info{ border-color:var(--volt); }
+.toast .toast-icon{ font-size:1.2rem; }
+.toast.success .toast-icon{ color:var(--green); }
+.toast.error .toast-icon{ color:var(--red); }
+.toast.warning .toast-icon{ color:var(--yellow); }
+.toast.info .toast-icon{ color:var(--volt); }
+
+@keyframes slideIn{
+  from{ transform:translateX(100px); opacity:0; }
+  to{ transform:translateX(0); opacity:1; }
+}
+
 /* ============ RESPONSIVE ============ */
 @media (max-width:992px){
   .hero-grid{ grid-template-columns:1fr; text-align:center; }
@@ -994,6 +1287,7 @@ body{
   .coach-modal-image{ min-height:300px; border-radius:1.5rem 1.5rem 0 0; }
   .free-features-grid{ grid-template-columns:1fr 1fr; }
   .sub-plans{ grid-template-columns:1fr; max-width:300px; margin:0 auto; }
+  .upi-apps{ grid-template-columns:repeat(2,1fr); }
 }
 @media (max-width:650px){
   .container{ padding:0 1.2rem; }
@@ -1017,6 +1311,10 @@ body{
   .free-features-grid{ grid-template-columns:1fr; }
   .sub-modal-box{ padding:1.8rem; }
   .sub-plans{ grid-template-columns:1fr; max-width:100%; }
+  .upi-modal-box{ padding:1.8rem; }
+  .upi-apps{ grid-template-columns:repeat(2,1fr); }
+  .transaction-input-group{ flex-direction:column; }
+  .otp-input-group{ flex-direction:column; }
 }
 @media (max-width:400px){
   .hero-content h1{ font-size:2.05rem; }
@@ -1033,6 +1331,7 @@ body{
 </svg>
 <div class="cursor-glow" id="cursorGlow"></div>
 
+<!-- NAVBAR -->
 <nav class="navbar" id="navbar">
   <div class="container nav-inner">
     <a href="#" class="logo"><span class="pulse-dot"></span>PEAKPULSE</a>
@@ -1051,6 +1350,7 @@ body{
   </div>
 </nav>
 
+<!-- HERO -->
 <section class="hero">
   <div class="container hero-grid">
     <div class="hero-content">
@@ -1071,6 +1371,7 @@ body{
   </div>
 </section>
 
+<!-- MARQUEE -->
 <div class="marquee-band">
   <div class="marquee-track">
     <span><i class="fas fa-circle"></i>STRENGTH &amp; CONDITIONING<i class="fas fa-circle"></i>WEIGHT MANAGEMENT<i class="fas fa-circle"></i>BODY TRANSFORMATION<i class="fas fa-circle"></i>PERSONAL TRAINING<i class="fas fa-circle"></i>FUNCTIONAL STRENGTH TRAINING</span>
@@ -1078,6 +1379,7 @@ body{
   </div>
 </div>
 
+<!-- CATEGORIES -->
 <section class="categories section-padding" id="categories">
   <div class="container">
     <div class="text-center reveal">
@@ -1096,6 +1398,7 @@ body{
   </div>
 </section>
 
+<!-- COACHES -->
 <section class="coaches section-padding" id="coaches">
   <div class="container">
     <div class="reveal">
@@ -1105,9 +1408,7 @@ body{
     </div>
     <div class="coach-grid" style="max-width:400px; margin:0 auto;">
       <div class="coach-card reveal" style="text-align:center; cursor:pointer;" id="coachCard">
-        <div class="coach-avatar" style="margin:0 auto 1.1rem;">
-          JB
-        </div>
+        <div class="coach-avatar" style="margin:0 auto 1.1rem;">JB</div>
         <h4>Jerin Babu</h4>
         <div class="role" id="typingRole"></div>
         <div class="bio-text" id="typingBio"></div>
@@ -1116,7 +1417,7 @@ body{
   </div>
 </section>
 
-<!-- ============ COACH MODAL ============ -->
+<!-- COACH MODAL -->
 <div class="coach-modal-overlay" id="coachModal">
   <div class="coach-modal-box">
     <button class="coach-modal-close" id="coachModalClose"><i class="fas fa-times"></i></button>
@@ -1130,28 +1431,17 @@ body{
         <div class="modal-role">Fitness Coach &amp; Transformation Specialist</div>
         <p class="modal-bio">Ex-competitive powerlifter with 5 years of experience helping clients transform their bodies and achieve their fitness goals through personalized training programs.</p>
         <div class="modal-specs">
-          <div class="spec-item">
-            <div class="label">Experience</div>
-            <div class="value">5+ Years</div>
-          </div>
-          <div class="spec-item">
-            <div class="label">Specialization</div>
-            <div class="value">Strength &amp; Conditioning</div>
-          </div>
-          <div class="spec-item">
-            <div class="label">Certifications</div>
-            <div class="value">Certified Personal Trainer</div>
-          </div>
-          <div class="spec-item">
-            <div class="label">Focus</div>
-            <div class="value">Body Transformation</div>
-          </div>
+          <div class="spec-item"><div class="label">Experience</div><div class="value">5+ Years</div></div>
+          <div class="spec-item"><div class="label">Specialization</div><div class="value">Strength &amp; Conditioning</div></div>
+          <div class="spec-item"><div class="label">Certifications</div><div class="value">Certified Personal Trainer</div></div>
+          <div class="spec-item"><div class="label">Focus</div><div class="value">Body Transformation</div></div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- WORKOUT BUILDER -->
 <section class="algo section-padding" id="builder">
   <div class="container">
     <div class="reveal">
@@ -1159,9 +1449,8 @@ body{
       <h2 class="section-title">Build Your Week</h2>
       <p class="section-subtitle">Answer four questions. We'll generate a full weekly split with sets, reps and rest — tuned to your goal and equipment.</p>
     </div>
-
-    <div class="algo-panel reveal">
-      <div class="algo-form">
+    <div class="algo-panel reveal" id="algoPanel">
+      <div class="algo-form" id="algoForm">
         <div class="form-group">
           <label>Goal</label>
           <div class="pill-row" id="goalRow">
@@ -1201,7 +1490,7 @@ body{
         <div class="output-placeholder locked" id="lockPlaceholder">
           <i class="fas fa-lock"></i>
           <p>Subscribe to unlock your personalized weekly split.</p>
-          <p style="font-size:0.8rem;margin-top:0.5rem;"><i class="fas fa-arrow-right" style="color:var(--volt);"></i> Click below to subscribe</p>
+          <p style="font-size:0.8rem;margin-top:0.5rem;"><i class="fas fa-arrow-right" style="color:var(--volt);"></i> Subscribe to get full access</p>
           <button class="btn-primary unlock-btn" id="unlockBtn" type="button"><i class="fas fa-unlock"></i> Subscribe Now</button>
         </div>
       </div>
@@ -1209,6 +1498,7 @@ body{
   </div>
 </section>
 
+<!-- PRICING -->
 <section class="pricing section-padding" id="pricing">
   <div class="container">
     <div class="text-center reveal">
@@ -1220,9 +1510,9 @@ body{
       <div class="price-card featured reveal">
         <h4>Starter Plan</h4>
         <div class="price" style="display:flex; align-items:baseline; justify-content:center; gap:0.8rem; flex-wrap:wrap;">
-          <span style="font-size:2.8rem;">₹299<span style="font-size:0.9rem; color:var(--text-muted); font-weight:500;">/week</span></span>
+          <span style="font-size:2.8rem;">₹999<span style="font-size:0.9rem; color:var(--text-muted); font-weight:500;">/week</span></span>
           <span style="color:var(--text-muted); font-size:1.2rem;">or</span>
-          <span style="font-size:2.8rem;">₹699<span style="font-size:0.9rem; color:var(--text-muted); font-weight:500;">/month</span></span>
+          <span style="font-size:2.8rem;">₹2999<span style="font-size:0.9rem; color:var(--text-muted); font-weight:500;">/month</span></span>
         </div>
         <p class="desc">Everything you need to start your fitness transformation.</p>
         <ul class="price-list">
@@ -1240,18 +1530,16 @@ body{
   </div>
 </section>
 
-<!-- ============ SUBSCRIPTION MODAL ============ -->
+<!-- SUBSCRIPTION MODAL -->
 <div class="sub-modal-overlay" id="subModal">
   <div class="sub-modal-box">
     <button class="sub-modal-close" id="subModalClose"><i class="fas fa-times"></i></button>
     <h3 class="sub-modal-title">Choose Your Plan</h3>
     <p class="sub-modal-sub">Select the subscription that works best for you</p>
-    
     <div class="sub-plans">
-      <!-- Weekly Plan -->
       <div class="sub-plan-card" data-plan="weekly" id="weeklyPlan">
         <div class="plan-badge">Weekly</div>
-        <div class="plan-price">₹299 <span>/week</span></div>
+        <div class="plan-price">₹999 <span>/week</span></div>
         <div class="plan-desc">Perfect for short-term commitment</div>
         <ul class="plan-features">
           <li><i class="fas fa-check"></i> Full program access</li>
@@ -1259,11 +1547,9 @@ body{
           <li><i class="fas fa-check"></i> Weekly progress review</li>
         </ul>
       </div>
-      
-      <!-- Monthly Plan -->
       <div class="sub-plan-card popular" data-plan="monthly" id="monthlyPlan">
         <div class="plan-badge">Monthly</div>
-        <div class="plan-price">₹699 <span>/month</span></div>
+        <div class="plan-price">₹2999 <span>/month</span></div>
         <div class="plan-desc">Best value for long-term results</div>
         <ul class="plan-features">
           <li><i class="fas fa-check"></i> All weekly features</li>
@@ -1273,60 +1559,108 @@ body{
         </ul>
       </div>
     </div>
-    
     <div class="sub-modal-actions">
-      <button class="btn-primary" id="proceedPaymentBtn" style="flex:1; justify-content:center;"><i class="fas fa-arrow-right"></i> Proceed to Payment</button>
+      <button class="btn-primary" id="proceedPaymentBtn" style="flex:1; justify-content:center;"><i class="fas fa-arrow-right"></i> Pay with UPI</button>
     </div>
-    <p style="text-align:center; margin-top:0.8rem; color:var(--text-muted); font-size:0.7rem;">Secure payment. Cancel anytime.</p>
+    <p style="text-align:center; margin-top:0.8rem; color:var(--text-muted); font-size:0.7rem;">Secure UPI payment. OTP verification required.</p>
   </div>
 </div>
 
-<!-- ============ PAYMENT SUCCESS MODAL ============ -->
+<!-- UPI PAYMENT MODAL -->
+<div class="upi-modal-overlay" id="upiModal">
+  <div class="upi-modal-box">
+    <button class="upi-modal-close" id="upiModalClose"><i class="fas fa-times"></i></button>
+    <h3 class="upi-modal-title"><i class="fas fa-qrcode" style="color:var(--volt);"></i> UPI Payment</h3>
+    <p class="upi-modal-sub">Scan QR code or use UPI ID to pay</p>
+    <div class="upi-qr-container">
+      <div id="upiQRContainer"></div>
+      <div class="upi-details">
+        <div class="upi-id">jerinbabu482@okaxis</div>
+        <div class="upi-amount" id="upiAmountDisplay">₹999</div>
+        <p style="color:var(--text-muted); font-size:0.8rem; margin-top:0.3rem;">Pay using any UPI app</p>
+      </div>
+    </div>
+    <div class="upi-apps">
+      <button class="upi-app-btn" data-app="gpay"><i class="fab fa-google-pay"></i>GPay</button>
+      <button class="upi-app-btn" data-app="phonepe"><i class="fas fa-mobile-alt"></i>PhonePe</button>
+      <button class="upi-app-btn" data-app="paytm"><i class="fas fa-rupee-sign"></i>Paytm</button>
+      <button class="upi-app-btn" data-app="others"><i class="fas fa-qrcode"></i>Others</button>
+    </div>
+    
+    <!-- Transaction ID Input -->
+    <div class="transaction-section">
+      <label>Enter Transaction ID</label>
+      <div class="transaction-input-group">
+        <input type="text" id="transactionIdInput" placeholder="TXN1234567890" maxlength="20">
+        <button class="btn-primary" id="sendOTPBtn"><i class="fas fa-envelope"></i> Send OTP</button>
+      </div>
+    </div>
+    
+    <!-- OTP Section -->
+    <div class="otp-section" id="otpSection">
+      <label>🔐 Enter OTP from Email</label>
+      <div class="otp-input-group">
+        <input type="text" id="otpInput" placeholder="Enter OTP" maxlength="10" autocomplete="one-time-code">
+        <button class="btn-primary" id="verifyOTPBtn"><i class="fas fa-check"></i> Verify</button>
+      </div>
+      <div class="otp-timer">
+        <span>⏱️ OTP expires in: <strong id="otpTimer">5:00</strong></span>
+        <span id="otpResendBtn" style="display:none;">
+          | <span class="resend-btn" onclick="resendOTP()">Resend OTP</span>
+        </span>
+      </div>
+      <div class="otp-status" id="otpStatus"></div>
+    </div>
+    
+    <div class="verification-status" id="verificationStatus">
+      <div style="display:flex; align-items:center;">
+        <span class="status-icon" id="statusIcon">⏳</span>
+        <span class="status-text" id="statusText">Verifying payment...</span>
+      </div>
+      <div class="status-detail" id="statusDetail">Please wait while we confirm your transaction</div>
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill"></div>
+      </div>
+    </div>
+    <p style="text-align:center; color:var(--text-muted); font-size:0.7rem; margin-top:1rem;">
+      <i class="fas fa-shield-alt" style="color:var(--volt);"></i> Your subscription will be activated after OTP verification
+    </p>
+  </div>
+</div>
+
+<!-- PAYMENT SUCCESS MODAL -->
 <div class="payment-success-overlay" id="paymentSuccess">
   <div class="payment-success-box">
     <div class="success-icon"><i class="fas fa-check-circle"></i></div>
     <h2>Payment Successful!</h2>
     <p>Thank you for subscribing to PeakPulse.</p>
-    <div class="plan-detail" id="selectedPlanDisplay">Weekly Plan - ₹299</div>
+    <div class="plan-detail" id="selectedPlanDisplay">Weekly Plan - ₹999</div>
     <p style="font-size:0.8rem; color:var(--text-muted);">Your fitness journey starts now. Your personalized plan is now unlocked!</p>
     <br>
     <button class="btn-primary" id="successContinueBtn" style="width:100%; justify-content:center;"><i class="fas fa-arrow-right"></i> Continue to Dashboard</button>
   </div>
 </div>
 
-<!-- ============ FINAL CTA ============ -->
+<!-- FINAL CTA -->
 <section class="final-cta">
   <div class="container">
     <div class="reveal">
       <h2>Your First Session Is Free</h2>
       <p>No card required. Build your plan, try a session, see how it feels.</p>
-      
-      <!-- Free Features Grid -->
       <div class="free-features-grid">
         <div class="free-feature-card">
           <div class="icon available"><i class="fas fa-check-circle"></i></div>
-          <div class="content">
-            <h4>Plan Generator</h4>
-            <p>Personalized weekly workout plan tailored to your goals and schedule.</p>
-          </div>
+          <div class="content"><h4>Plan Generator</h4><p>Personalized weekly workout plan tailored to your goals and schedule.</p></div>
         </div>
         <div class="free-feature-card">
           <div class="icon available"><i class="fas fa-check-circle"></i></div>
-          <div class="content">
-            <h4>Food Generator</h4>
-            <p>Nutrition recommendations to support your fitness goals and recovery.</p>
-          </div>
+          <div class="content"><h4>Food Generator</h4><p>Nutrition recommendations to support your fitness goals and recovery.</p></div>
         </div>
         <div class="free-feature-card">
           <div class="icon available"><i class="fas fa-check-circle"></i></div>
-          <div class="content">
-            <h4>Things to Do</h4>
-            <p>Actionable daily tasks to keep you on track and build healthy habits.</p>
-          </div>
+          <div class="content"><h4>Things to Do</h4><p>Actionable daily tasks to keep you on track and build healthy habits.</p></div>
         </div>
       </div>
-      
-      <!-- Premium Features Notice -->
       <div class="premium-notice">
         <p>
           <span class="label">Premium features (not included in free session):</span>
@@ -1335,12 +1669,12 @@ body{
           <span class="premium-item"><span class="cross"><i class="fas fa-times-circle"></i></span> Progress tracking</span>
         </p>
       </div>
-      
       <a href="#builder" class="btn-primary"><i class="fas fa-bolt"></i> Get Started</a>
     </div>
   </div>
 </section>
 
+<!-- FOOTER -->
 <footer class="footer">
   <div class="container">
     <div class="footer-grid">
@@ -1365,7 +1699,7 @@ body{
   </div>
 </footer>
 
-<!-- ============ AUTH MODAL ============ -->
+<!-- AUTH MODAL -->
 <div class="modal-overlay" id="authModal">
   <div class="modal-box">
     <button class="modal-close-x" id="authModalClose" type="button" aria-label="Close"><i class="fas fa-times"></i></button>
@@ -1403,6 +1737,9 @@ body{
   </div>
 </div>
 
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
 <script>
 // ============================================================
 //  SUPABASE CONFIGURATION
@@ -1413,132 +1750,287 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Initialize Supabase
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-console.log('Supabase initialized!');
+console.log('✅ Supabase initialized!');
 
 // ============ GLOBAL STATE ============
 let currentDisplayName = '';
 let selectedPlan = null;
-let isSubscribed = false; // Track if user has paid subscription
+let isSubscribed = false;
+let currentUserId = null;
+let currentQRCode = null;
 
-// ============ RAZORPAY CONFIGURATION ============
-// IMPORTANT: Replace with your actual Razorpay Key ID from dashboard
-const RAZORPAY_KEY_ID = 'rzp_test_XXXXXXXXXXXXXXXX'; // Replace with your test key
+// ============ UPI CONFIGURATION ============
+const UPI_CONFIG = {
+  id: 'jerinbabu482@okaxis',
+  name: 'Jerin Babu',
+  merchant: 'PeakPulse'
+};
 
-function getPlanDetails(planType) {
-  if (planType === 'weekly') {
-    return {
-      amount: 29900, // in paise (₹299)
-      currency: 'INR',
-      name: 'Weekly Plan',
-      description: 'PeakPulse Weekly Subscription',
-      plan: 'Weekly Plan - ₹299'
-    };
-  } else {
-    return {
-      amount: 69900, // in paise (₹699)
-      currency: 'INR',
-      name: 'Monthly Plan',
-      description: 'PeakPulse Monthly Subscription',
-      plan: 'Monthly Plan - ₹699'
-    };
-  }
-}
+// ============ EMAILJS CONFIGURATION ============
+const EMAILJS_CONFIG = {
+    PUBLIC_KEY: 'P-cYy0OsFWcPZlJxl',
+    SERVICE_ID: 'service_dowlxyr',
+    TEMPLATE_ID: 'template_gcus8th'
+};
 
-function openRazorpayPayment(planType, userEmail, userName) {
-  const plan = getPlanDetails(planType);
+// Initialize EmailJS
+emailjs.init(EMAILJS_CONFIG.PUBLIC_KEY);
+
+console.log('📧 EmailJS initialized!');
+
+// ============ OTP CONFIGURATION ============
+const FIXED_OTP = '7BD43I8D';
+let otpTimer = null;
+let otpTimeout = null;
+let resendCount = 0;
+const MAX_RESEND = 3;
+
+// ============ TOAST SYSTEM ============
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
   
-  const options = {
-    key: RAZORPAY_KEY_ID,
-    amount: plan.amount,
-    currency: plan.currency,
-    name: 'PeakPulse Fitness',
-    description: plan.description,
-    image: 'https://peakpulse.com/logo.png', // Replace with your logo URL
-    prefill: {
-      name: userName || 'PeakPulse User',
-      email: userEmail || 'user@example.com',
-      contact: '9895690857'
-    },
-    theme: {
-      color: '#d4ff3f'
-    },
-    modal: {
-      ondismiss: function() {
-        console.log('Payment modal closed');
-      }
-    },
-    handler: function(response) {
-      // Payment successful - unlock the generator
-      console.log('Payment successful:', response);
-      isSubscribed = true;
-      
-      // Save subscription status to localStorage
-      localStorage.setItem('peakpulse_subscribed', 'true');
-      localStorage.setItem('peakpulse_plan', plan.plan);
-      localStorage.setItem('peakpulse_payment_id', response.razorpay_payment_id);
-      
-      // Show success modal
-      showPaymentSuccess(plan.plan);
-      
-      // Unlock the generator
-      profile.complete = true;
-      generatePlan();
-      
-      // Update the UI to show unlocked state
-      document.querySelector('.output-placeholder.locked i').className = 'fas fa-unlock';
-      document.querySelector('.output-placeholder.locked p').textContent = 'Your personalized weekly split is ready!';
-      
-      // Save payment to database
-      savePaymentToDatabase(response, planType, userEmail);
-    }
+  const icons = {
+    success: '✅',
+    error: '❌',
+    warning: '⚠️',
+    info: 'ℹ️'
   };
   
-  const rzp = new Razorpay(options);
-  rzp.open();
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+    <span>${message}</span>
+  `;
+  
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100px)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
 }
 
-async function savePaymentToDatabase(paymentResponse, planType, userEmail) {
-  try {
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) return;
+// ============ SEND OTP EMAIL ============
+async function sendOTPEmail(userEmail, userName, transactionId, planType) {
+    try {
+        console.log('📧 Sending OTP email...');
+        console.log('📧 From: completefitx@gmail.com');
+        console.log('📧 To:', userEmail);
+        console.log('📧 OTP:', FIXED_OTP);
+        
+        const planName = planType === 'weekly' ? 'Weekly Plan - ₹999' : 'Monthly Plan - ₹2999';
+
+        const templateParams = {
+            to_email: userEmail,
+            user_name: userName || 'PeakPulse User',
+            passcode: FIXED_OTP,
+            plan_name: planName,
+            transaction_id: transactionId || 'N/A'
+        };
+
+        const response = await emailjs.send(
+            EMAILJS_CONFIG.SERVICE_ID,
+            EMAILJS_CONFIG.TEMPLATE_ID,
+            templateParams
+        );
+
+        console.log('✅ Email sent successfully!', response);
+        return { success: true };
+
+    } catch (error) {
+        console.error('❌ Email send error:', error);
+        return { success: false, error: error.message || 'Failed to send email' };
+    }
+}
+
+// ============ REQUEST OTP ============
+async function requestOTP() {
+    const transactionId = document.getElementById('transactionIdInput').value.trim();
     
-    // Save subscription status to profiles table
-    const { error } = await supabaseClient
-      .from('profiles')
-      .update({
-        is_subscribed: true,
-        subscription_plan: planType,
-        subscription_start: new Date().toISOString(),
-        payment_id: paymentResponse.razorpay_payment_id
-      })
-      .eq('user_id', user.id);
-      
-    if (error) console.error('Error saving subscription:', error);
-  } catch (error) {
-    console.error('Error saving payment to database:', error);
-  }
+    if (!transactionId) {
+        showToast('Please enter your transaction ID first!', 'warning');
+        return;
+    }
+    
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    
+    if (!user) {
+        showToast('Please login first to receive OTP', 'warning');
+        return;
+    }
+
+    const userEmail = user.email;
+    const userName = user.user_metadata?.display_name || profile.name || 'User';
+
+    if (!userEmail) {
+        showToast('No email found. Please update your profile.', 'error');
+        return;
+    }
+
+    // Store email for future use
+    localStorage.setItem('userEmail', userEmail);
+    localStorage.setItem('transactionId', transactionId);
+
+    // Show OTP section
+    document.getElementById('otpSection').style.display = 'block';
+    document.getElementById('otpSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    const statusEl = document.getElementById('otpStatus');
+    statusEl.className = 'otp-status visible pending';
+    statusEl.innerHTML = `
+        <i class="fas fa-spinner fa-spin"></i> 
+        Sending OTP to ${userEmail}...
+    `;
+
+    // Send OTP email
+    const result = await sendOTPEmail(userEmail, FIXED_OTP, userName, transactionId);
+
+    if (result.success) {
+        statusEl.className = 'otp-status visible pending';
+        statusEl.innerHTML = `
+            <i class="fas fa-check-circle" style="color:var(--green);"></i> 
+            ✅ OTP sent to <strong>${userEmail}</strong>
+            <br><small style="display:block;margin-top:0.3rem;color:var(--text-muted);">
+                📧 From: completefitx@gmail.com | Check inbox/spam
+            </small>
+        `;
+        
+        startOTPTimer();
+        showToast('📧 OTP sent to your email!', 'success');
+        
+    } else {
+        statusEl.className = 'otp-status visible error';
+        statusEl.innerHTML = `
+            <i class="fas fa-exclamation-circle"></i> 
+            ❌ Failed to send OTP. Please try again.
+        `;
+        showToast('Failed to send OTP. Please try again.', 'error');
+    }
 }
 
-function showPaymentSuccess(planName) {
-  const overlay = document.getElementById('paymentSuccess');
-  document.getElementById('selectedPlanDisplay').textContent = planName;
-  overlay.classList.add('open');
-  requestAnimationFrame(() => overlay.classList.add('show'));
-  document.body.style.overflow = 'hidden';
+// ============ START OTP TIMER ============
+function startOTPTimer() {
+    let timeLeft = 300; // 5 minutes
+    const timerDisplay = document.getElementById('otpTimer');
+    
+    if (otpTimeout) clearInterval(otpTimeout);
+    
+    otpTimeout = setInterval(() => {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        timeLeft--;
+        
+        if (timeLeft < 0) {
+            clearInterval(otpTimeout);
+            timerDisplay.textContent = 'Expired';
+            document.getElementById('otpResendBtn').style.display = 'inline';
+            document.getElementById('otpInput').disabled = true;
+            document.getElementById('verifyOTPBtn').disabled = true;
+            showToast('⏰ OTP expired. Request a new one.', 'warning');
+        }
+    }, 1000);
 }
 
-// Check if user already has active subscription
-function checkSubscriptionStatus() {
-  const saved = localStorage.getItem('peakpulse_subscribed');
-  if (saved === 'true') {
-    isSubscribed = true;
-    profile.complete = true;
-    return true;
-  }
-  return false;
+// ============ VERIFY OTP ============
+async function verifyOTP() {
+    const enteredOTP = document.getElementById('otpInput').value.trim().toUpperCase();
+    const statusEl = document.getElementById('otpStatus');
+    const verifyBtn = document.getElementById('verifyOTPBtn');
+    
+    if (!enteredOTP) {
+        statusEl.className = 'otp-status visible error';
+        statusEl.innerHTML = '❌ Please enter the OTP.';
+        return;
+    }
+    
+    if (enteredOTP === FIXED_OTP) {
+        // ✅ OTP Verified - Activate Subscription
+        statusEl.className = 'otp-status visible success';
+        statusEl.innerHTML = `
+            ✅ OTP Verified! Activating your subscription...
+            <div style="margin-top:0.5rem;">
+                <div class="progress-bar visible">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+        `;
+        
+        verifyBtn.disabled = true;
+        verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+        
+        setTimeout(async () => {
+            try {
+                await activateSubscriptionAutomatically(selectedPlan);
+                
+                statusEl.className = 'otp-status visible success';
+                statusEl.innerHTML = '🎉 Subscription activated successfully!';
+                
+                showToast('🎉 Subscription activated successfully!', 'success');
+                
+                setTimeout(() => {
+                    closeUPIModal();
+                    showPaymentSuccess(getPlanName(selectedPlan));
+                }, 1500);
+                
+            } catch (error) {
+                statusEl.className = 'otp-status visible error';
+                statusEl.innerHTML = '❌ Failed to activate: ' + error.message;
+                verifyBtn.disabled = false;
+                verifyBtn.innerHTML = '<i class="fas fa-check"></i> Verify';
+            }
+        }, 2000);
+        
+    } else {
+        // ❌ Invalid OTP
+        statusEl.className = 'otp-status visible error';
+        statusEl.innerHTML = '❌ Invalid OTP. Please try again.';
+        document.getElementById('otpInput').value = '';
+        document.getElementById('otpInput').focus();
+        showToast('❌ Invalid OTP. Please try again.', 'error');
+    }
 }
 
-// ============ CURSOR GLOW ============ */
+// ============ RESEND OTP ============
+async function resendOTP() {
+    resendCount++;
+    if (resendCount > MAX_RESEND) {
+        showToast('Maximum resend attempts reached. Please contact support.', 'error');
+        return;
+    }
+    
+    const transactionId = localStorage.getItem('transactionId');
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const email = user?.email || localStorage.getItem('userEmail');
+    
+    if (!email) {
+        showToast('No email found. Please login again.', 'error');
+        return;
+    }
+    
+    const statusEl = document.getElementById('otpStatus');
+    statusEl.className = 'otp-status visible pending';
+    statusEl.innerHTML = '⏳ Resending OTP...';
+    
+    await sendOTPEmail(email, FIXED_OTP, profile.name || 'User', transactionId);
+    
+    document.getElementById('otpResendBtn').style.display = 'none';
+    document.getElementById('otpInput').disabled = false;
+    document.getElementById('verifyOTPBtn').disabled = false;
+    startOTPTimer();
+    
+    statusEl.className = 'otp-status visible pending';
+    statusEl.innerHTML = `
+        ✅ OTP resent to <strong>${email}</strong>
+        <br><small>From: completefitx@gmail.com</small>
+    `;
+    showToast('📧 OTP resent!', 'success');
+}
+
+// ============ CURSOR GLOW ============
 const glow = document.getElementById('cursorGlow');
 const heroEl = document.querySelector('.hero');
 if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
@@ -1550,7 +2042,7 @@ if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
   heroEl.addEventListener('mouseleave', () => { glow.style.opacity = '0'; });
 }
 
-/* ============ NAV ============ */
+// ============ NAV ============
 const navbar = document.getElementById('navbar');
 const navToggle = document.getElementById('navToggle');
 const navLinks = document.getElementById('navLinks');
@@ -1558,7 +2050,7 @@ window.addEventListener('scroll', () => navbar.classList.toggle('scrolled', wind
 navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
 navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => navLinks.classList.remove('open')));
 
-/* ============ SCROLL REVEAL ============ */
+// ============ SCROLL REVEAL ============
 const revealEls = document.querySelectorAll('.reveal');
 const io = new IntersectionObserver((entries) => {
   entries.forEach((entry, i) => {
@@ -1570,39 +2062,22 @@ const io = new IntersectionObserver((entries) => {
 }, { threshold: 0.12 });
 revealEls.forEach(el => io.observe(el));
 
-/* ============ TYPING ANIMATION ============ */
+// ============ TYPING ANIMATION ============
 function typeText(element, text, speed = 40) {
   let index = 0;
   element.innerHTML = '';
-  const cursorSpan = document.createElement('span');
-  cursorSpan.className = 'cursor-blink';
   
   function type() {
     if (index < text.length) {
-      const char = text.charAt(index);
       element.innerHTML = text.substring(0, index + 1);
-      const cursor = element.querySelector('.cursor-blink');
-      if (!cursor) {
-        const newCursor = document.createElement('span');
-        newCursor.className = 'cursor-blink';
-        element.appendChild(newCursor);
-      }
       index++;
       setTimeout(type, speed);
-    } else {
-      const cursor = element.querySelector('.cursor-blink');
-      if (cursor) cursor.remove();
     }
   }
-  
-  const initialCursor = document.createElement('span');
-  initialCursor.className = 'cursor-blink';
-  element.appendChild(initialCursor);
   
   setTimeout(type, 500);
 }
 
-// ============ COACH TYPING ANIMATION ============
 function startCoachTyping() {
   const roleElement = document.getElementById('typingRole');
   const bioElement = document.getElementById('typingBio');
@@ -1648,92 +2123,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ============ SUBSCRIPTION MODAL ============
-const subModal = document.getElementById('subModal');
-const subModalClose = document.getElementById('subModalClose');
-const subscribeBtn = document.getElementById('subscribeBtn');
-const weeklyPlan = document.getElementById('weeklyPlan');
-const monthlyPlan = document.getElementById('monthlyPlan');
-const proceedPaymentBtn = document.getElementById('proceedPaymentBtn');
-const successContinueBtn = document.getElementById('successContinueBtn');
-
-function openSubModal() {
-  selectedPlan = null;
-  weeklyPlan.classList.remove('selected');
-  monthlyPlan.classList.remove('selected');
-  
-  subModal.classList.add('open');
-  requestAnimationFrame(() => subModal.classList.add('show'));
-  document.body.style.overflow = 'hidden';
-}
-
-function closeSubModal() {
-  subModal.classList.remove('show');
-  setTimeout(() => {
-    subModal.classList.remove('open');
-    document.body.style.overflow = '';
-  }, 400);
-}
-
-subscribeBtn.addEventListener('click', openSubModal);
-subModalClose.addEventListener('click', closeSubModal);
-subModal.addEventListener('click', (e) => {
-  if (e.target === subModal) closeSubModal();
-});
-
-// Plan selection
-weeklyPlan.addEventListener('click', () => {
-  weeklyPlan.classList.remove('selected');
-  monthlyPlan.classList.remove('selected');
-  weeklyPlan.classList.add('selected');
-  selectedPlan = 'weekly';
-});
-
-monthlyPlan.addEventListener('click', () => {
-  weeklyPlan.classList.remove('selected');
-  monthlyPlan.classList.remove('selected');
-  monthlyPlan.classList.add('selected');
-  selectedPlan = 'monthly';
-});
-
-// Proceed to payment
-proceedPaymentBtn.addEventListener('click', () => {
-  if (!selectedPlan) {
-    alert('Please select a plan first!');
-    return;
-  }
-  
-  // Get user info if logged in
-  const userEmail = document.getElementById('authEmail')?.value || 'user@example.com';
-  const userName = document.getElementById('authDisplayName')?.value || 'PeakPulse User';
-  
-  // Close subscription modal
-  closeSubModal();
-  
-  // Open Razorpay payment
-  openRazorpayPayment(selectedPlan, userEmail, userName);
-});
-
-// Success continue button
-successContinueBtn.addEventListener('click', () => {
-  const overlay = document.getElementById('paymentSuccess');
-  overlay.classList.remove('show');
-  setTimeout(() => {
-    overlay.classList.remove('open');
-    document.body.style.overflow = '';
-  }, 500);
-  // Redirect to dashboard
-  window.location.href = '#builder';
-});
-
-// Escape key for sub modal
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && subModal.classList.contains('open')) {
-    closeSubModal();
-  }
-});
-
-/* ============ DATE UTILITIES ============ */
+// ============ DATE UTILITIES ============
 function getCurrentDayIndex() {
   const today = new Date();
   let dayIndex = today.getDay() - 1;
@@ -1752,7 +2142,7 @@ function getDayName(dayIndex) {
   return days[dayIndex] || 'Monday';
 }
 
-// ============ COMPLETE WORKOUT DATABASE WITH TARGET MUSCLES ============
+// ============ WORKOUT DATABASE ============
 const WORKOUT_DB = {
   'Barbell Bench Press': { muscles: 'Chest, Front Shoulders, Triceps' },
   'Bent-Over Barbell Row': { muscles: 'Lats, Rhomboids, Traps, Biceps' },
@@ -1877,7 +2267,7 @@ function getDayLabel(dayIndex) {
   return labels[dayIndex] || 'Workout Day';
 }
 
-/* ============ WORKOUT STATE ============ */
+// ============ WORKOUT STATE ============
 const state = { goal: 'strength', level: 'beginner', equipment: 'gym', days: 4 };
 const profile = { complete: false, name: '', username: '' };
 
@@ -1888,7 +2278,7 @@ function wirePillRow(rowId, key, targetObj) {
     document.querySelectorAll(`#${rowId} .pill`).forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     targetObj[key] = btn.dataset.val;
-    if (targetObj === state && profile.complete) generatePlan();
+    if (targetObj === state && profile.complete && isSubscribed) generatePlan();
   });
 }
 wirePillRow('goalRow', 'goal', state);
@@ -1899,13 +2289,38 @@ const daysVal = document.getElementById('daysVal');
 document.getElementById('daysMinus').addEventListener('click', () => {
   state.days = Math.max(3, state.days - 1);
   daysVal.textContent = state.days;
-  if (profile.complete) generatePlan();
+  if (profile.complete && isSubscribed) generatePlan();
 });
 document.getElementById('daysPlus').addEventListener('click', () => {
   state.days = Math.min(6, state.days + 1);
   daysVal.textContent = state.days;
-  if (profile.complete) generatePlan();
+  if (profile.complete && isSubscribed) generatePlan();
 });
+
+// ============ LOCK/UNLOCK WORKOUT BUILDER ============
+function setWorkoutBuilderLocked(locked) {
+  const form = document.getElementById('algoForm');
+  const output = document.getElementById('algoOutput');
+  
+  if (locked) {
+    form.classList.add('locked');
+    output.innerHTML = `
+      <div class="output-placeholder locked" id="lockPlaceholder">
+        <i class="fas fa-lock"></i>
+        <p>Subscribe to unlock your personalized weekly split.</p>
+        <p style="font-size:0.8rem;margin-top:0.5rem;"><i class="fas fa-arrow-right" style="color:var(--volt);"></i> Subscribe to get full access</p>
+        <button class="btn-primary unlock-btn" id="unlockBtn" type="button"><i class="fas fa-unlock"></i> Subscribe Now</button>
+      </div>
+    `;
+    const unlockBtn = document.getElementById('unlockBtn');
+    if (unlockBtn) unlockBtn.addEventListener('click', () => openSubModal());
+  } else {
+    form.classList.remove('locked');
+    if (isSubscribed) {
+      generatePlan();
+    }
+  }
+}
 
 // ============ SUPABASE FUNCTIONS ============
 async function saveUserData(userId, data) {
@@ -1915,13 +2330,13 @@ async function saveUserData(userId, data) {
         .from('profiles')
         .upsert({
           user_id: userId,
-          username: data.profile.username,
-          name: data.profile.name || data.profile.display_name,
+          username: data.profile.username || 'user_' + userId.slice(0, 8),
+          name: data.profile.name || data.profile.display_name || 'User',
           goal: data.profile.goal || 'strength',
           experience_level: data.profile.level || 'beginner',
           equipment: data.profile.equipment || 'gym'
         }, { onConflict: 'user_id' });
-      if (error) console.error('Error saving profile:', error);
+      if (error) console.warn('Error saving profile:', error);
     }
 
     if (data.plan) {
@@ -1935,7 +2350,7 @@ async function saveUserData(userId, data) {
           experience_level: data.plan.level,
           exercises: data.plan.exercises
         }, { onConflict: 'user_id' });
-      if (error) console.error('Error saving plan:', error);
+      if (error) console.warn('Error saving plan:', error);
     }
 
     if (data.progress) {
@@ -1948,7 +2363,7 @@ async function saveUserData(userId, data) {
           total_sessions: data.progress.total || 0,
           week_minutes: data.progress.week || [0,0,0,0,0,0,0]
         }, { onConflict: 'user_id' });
-      if (error) console.error('Error saving progress:', error);
+      if (error) console.warn('Error saving progress:', error);
     }
 
     if (data.checklist) {
@@ -1961,11 +2376,11 @@ async function saveUserData(userId, data) {
             completed: completed,
             completed_at: completed ? new Date().toISOString() : null
           }, { onConflict: 'user_id, exercise_key' });
-        if (error) console.error('Error saving checklist:', error);
+        if (error) console.warn('Error saving checklist:', error);
       }
     }
   } catch (error) {
-    console.error('Error saving user data:', error);
+    console.warn('Error saving user data:', error);
   }
 }
 
@@ -1977,9 +2392,7 @@ async function loadUserData(userId) {
       .eq('user_id', userId)
       .maybeSingle();
     
-    if (profileError) {
-      console.error('Error loading profile:', profileError);
-    }
+    if (profileError) console.warn('Error loading profile:', profileError);
 
     const { data: planData, error: planError } = await supabaseClient
       .from('workout_plans')
@@ -2019,7 +2432,7 @@ async function loadUserData(userId) {
       checklist: checklist
     };
   } catch (error) {
-    console.error('Error loading user data:', error);
+    console.warn('Error loading user data:', error);
     return null;
   }
 }
@@ -2040,8 +2453,12 @@ function updateNavWithUser(displayName) {
       logoutBtn.addEventListener('click', async () => {
         await supabaseClient.auth.signOut();
         currentDisplayName = '';
+        isSubscribed = false;
+        localStorage.removeItem('peakpulse_subscribed');
+        localStorage.removeItem('peakpulse_plan');
         updateNavWithUser(null);
-        location.reload();
+        setWorkoutBuilderLocked(true);
+        window.location.reload();
       });
     }
   } else {
@@ -2059,7 +2476,6 @@ const authForm = document.getElementById('authForm');
 let isLoginMode = true;
 
 function openAuthModal() {
-  console.log('Opening auth modal');
   authModal.classList.add('open');
   setTimeout(() => authModal.classList.add('show'), 50);
 }
@@ -2133,8 +2549,9 @@ authForm.addEventListener('submit', async (e) => {
         password: password
       });
       if (error) throw error;
-      alert('Login successful! Welcome back.');
+      showToast('Login successful! Welcome back.', 'success');
       closeAuthModal();
+      currentUserId = data.user.id;
       await loadUserDataFromSupabase(data.user.id);
     } else {
       const { data, error } = await supabaseClient.auth.signUp({
@@ -2170,89 +2587,270 @@ authForm.addEventListener('submit', async (e) => {
         }
       }
       
-      alert('Account created! You are now logged in.');
+      showToast('Account created! You are now logged in.', 'success');
       closeAuthModal();
+      currentUserId = data.user.id;
       await loadUserDataFromSupabase(data.user.id);
     }
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, 'error');
   }
 });
 
-async function loadUserDataFromSupabase(userId) {
-  const userData = await loadUserData(userId);
-  if (!userData) {
-    profile.complete = false;
-    renderLockedPlaceholder();
-    renderChecklist([]);
-    updateNavWithUser(null);
-    return;
+// ============ UPI PAYMENT SYSTEM ============
+
+class UPIPaymentVerification {
+  constructor() {
+    this.pendingPayments = new Map();
+    this.verifiedPayments = new Map();
+    this.merchantUPI = UPI_CONFIG.id;
   }
 
-  profile.complete = true;
-  profile.name = userData.profile?.name || userData.profile?.display_name || 'you';
-  profile.username = userData.profile?.username || '';
-  
-  currentDisplayName = profile.name;
-  updateNavWithUser(currentDisplayName);
-  
-  // Check if user has active subscription from database
-  if (userData.profile?.is_subscribed) {
-    isSubscribed = true;
-    localStorage.setItem('peakpulse_subscribed', 'true');
-    profile.complete = true;
-  }
-  
-  if (userData.plan) {
-    state.goal = userData.plan.goal || 'strength';
-    state.level = userData.plan.experience_level || 'beginner';
-    state.equipment = userData.plan.equipment || 'gym';
-    state.days = userData.plan.days || 4;
-    daysVal.textContent = state.days;
-    document.querySelectorAll('#goalRow .pill').forEach(p => p.classList.toggle('active', p.dataset.val === state.goal));
-    document.querySelectorAll('#levelRow .pill').forEach(p => p.classList.toggle('active', p.dataset.val === state.level));
-    document.querySelectorAll('#equipRow .pill').forEach(p => p.classList.toggle('active', p.dataset.val === state.equipment));
-    state.currentPlan = userData.plan;
-  } else {
-    state.currentPlan = null;
+  generateUPIQR(planType) {
+    const amount = planType === 'weekly' ? 999 : 2999;
+    const transactionId = 'PP_' + Date.now() + '_' + (currentUserId || 'guest');
+    const upiString = `upi://pay?pa=${this.merchantUPI}&pn=${UPI_CONFIG.name}&am=${amount}&cu=INR&tn=${transactionId}&mc=1234`;
+    
+    this.pendingPayments.set(transactionId, {
+      transactionId: transactionId,
+      planType: planType,
+      amount: amount,
+      userId: currentUserId,
+      timestamp: Date.now(),
+      status: 'pending'
+    });
+    
+    return {
+      upiString: upiString,
+      transactionId: transactionId,
+      amount: amount
+    };
   }
 
-  // If subscribed or has plan, generate plan
-  if (isSubscribed || profile.complete) {
-    generatePlan();
-  } else {
-    renderLockedPlaceholder();
+  async verifyPayment(transactionId) {
+    const payment = this.pendingPayments.get(transactionId);
+    if (!payment) {
+      return { success: false, error: 'Transaction not found.' };
+    }
+    return { 
+      success: false, 
+      pending: true,
+      transactionId: transactionId
+    };
   }
-  renderChecklist(userData.checklist || {});
 }
 
-function renderLockedPlaceholder() {
-  const output = document.getElementById('algoOutput');
-  if (!output) return;
-  output.innerHTML = `
-    <div class="output-placeholder locked" id="lockPlaceholder">
-      <i class="fas fa-lock"></i>
-      <p>Subscribe to unlock your personalized weekly split.</p>
-      <p style="font-size:0.8rem;margin-top:0.5rem;"><i class="fas fa-arrow-right" style="color:var(--volt);"></i> Click below to subscribe</p>
-      <button class="btn-primary unlock-btn" id="unlockBtn" type="button"><i class="fas fa-unlock"></i> Subscribe Now</button>
-    </div>
-  `;
-  const unlockBtn = document.getElementById('unlockBtn');
-  if (unlockBtn) unlockBtn.addEventListener('click', () => {
-    // Open subscription modal
-    openSubModal();
+const upiSystem = new UPIPaymentVerification();
+
+// ============ UPI MODAL FUNCTIONS ============
+const upiModal = document.getElementById('upiModal');
+const upiModalClose = document.getElementById('upiModalClose');
+
+function openUPIModal(planType) {
+  const upiData = upiSystem.generateUPIQR(planType);
+  
+  document.getElementById('upiAmountDisplay').textContent = `₹${upiData.amount}`;
+  
+  const qrContainer = document.getElementById('upiQRContainer');
+  qrContainer.innerHTML = '';
+  
+  try {
+    currentQRCode = new QRCode(qrContainer, {
+      text: upiData.upiString,
+      width: 220,
+      height: 220,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  } catch (e) {
+    qrContainer.innerHTML = `
+      <div style="background:white; padding:1rem; border-radius:0.5rem; text-align:center;">
+        <p style="color:#000; font-size:1.2rem; font-weight:bold;">PeakPulse</p>
+        <p style="color:#000; font-size:1rem;">UPI: ${UPI_CONFIG.id}</p>
+        <p style="color:#000; font-size:1.2rem;">₹${upiData.amount}</p>
+        <button class="btn-primary" onclick="copyUPIId()" style="margin-top:0.5rem;">
+          <i class="fas fa-copy"></i> Copy UPI ID
+        </button>
+      </div>
+    `;
+  }
+  
+  qrContainer.dataset.transactionId = upiData.transactionId;
+  
+  const statusEl = document.getElementById('verificationStatus');
+  statusEl.classList.remove('visible', 'success', 'failed', 'pending');
+  document.getElementById('transactionIdInput').value = '';
+  document.getElementById('progressBar').className = 'progress-bar';
+  
+  upiModal.classList.add('open');
+  requestAnimationFrame(() => upiModal.classList.add('show'));
+  document.body.style.overflow = 'hidden';
+}
+
+function copyUPIId() {
+  navigator.clipboard.writeText(UPI_CONFIG.id).then(() => {
+    showToast('UPI ID copied to clipboard!', 'success');
+  }).catch(() => {
+    const textArea = document.createElement('textarea');
+    textArea.value = UPI_CONFIG.id;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    textArea.remove();
+    showToast('UPI ID copied to clipboard!', 'success');
   });
 }
 
+function closeUPIModal() {
+  upiModal.classList.remove('show');
+  setTimeout(() => {
+    upiModal.classList.remove('open');
+    document.body.style.overflow = '';
+  }, 400);
+}
+
+upiModalClose.addEventListener('click', closeUPIModal);
+upiModal.addEventListener('click', (e) => {
+  if (e.target === upiModal) closeUPIModal();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && upiModal.classList.contains('open')) {
+    closeUPIModal();
+  }
+});
+
+// ============ UPI APP HANDLERS ============
+document.querySelectorAll('.upi-app-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const app = this.dataset.app;
+    const upiId = UPI_CONFIG.id;
+    const amount = document.getElementById('upiAmountDisplay').textContent.replace('₹', '');
+    const transactionId = document.querySelector('#upiQRContainer')?.dataset?.transactionId || 'PP_' + Date.now();
+    
+    let upiDeepLink = '';
+    switch(app) {
+      case 'gpay':
+        upiDeepLink = `gpay://upi/pay?pa=${upiId}&pn=${UPI_CONFIG.name}&am=${amount}&cu=INR&tn=${transactionId}`;
+        break;
+      case 'phonepe':
+        upiDeepLink = `phonepe://upi/pay?pa=${upiId}&pn=${UPI_CONFIG.name}&am=${amount}&cu=INR&tn=${transactionId}`;
+        break;
+      case 'paytm':
+        upiDeepLink = `paytm://upi/pay?pa=${upiId}&pn=${UPI_CONFIG.name}&am=${amount}&cu=INR&tn=${transactionId}`;
+        break;
+      default:
+        copyUPIId();
+        return;
+    }
+    
+    window.location.href = upiDeepLink;
+    showToast('Payment initiated. Please enter the transaction ID after payment.', 'info');
+  });
+});
+
+// ============ SUBSCRIPTION MODAL ============
+const subModal = document.getElementById('subModal');
+const subModalClose = document.getElementById('subModalClose');
+const subscribeBtn = document.getElementById('subscribeBtn');
+const weeklyPlan = document.getElementById('weeklyPlan');
+const monthlyPlan = document.getElementById('monthlyPlan');
+const proceedPaymentBtn = document.getElementById('proceedPaymentBtn');
+const successContinueBtn = document.getElementById('successContinueBtn');
+
+function openSubModal() {
+  selectedPlan = null;
+  weeklyPlan.classList.remove('selected');
+  monthlyPlan.classList.remove('selected');
+  
+  subModal.classList.add('open');
+  requestAnimationFrame(() => subModal.classList.add('show'));
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSubModal() {
+  subModal.classList.remove('show');
+  setTimeout(() => {
+    subModal.classList.remove('open');
+    document.body.style.overflow = '';
+  }, 400);
+}
+
+subscribeBtn.addEventListener('click', openSubModal);
+subModalClose.addEventListener('click', closeSubModal);
+subModal.addEventListener('click', (e) => {
+  if (e.target === subModal) closeSubModal();
+});
+
+weeklyPlan.addEventListener('click', () => {
+  weeklyPlan.classList.remove('selected');
+  monthlyPlan.classList.remove('selected');
+  weeklyPlan.classList.add('selected');
+  selectedPlan = 'weekly';
+});
+
+monthlyPlan.addEventListener('click', () => {
+  weeklyPlan.classList.remove('selected');
+  monthlyPlan.classList.remove('selected');
+  monthlyPlan.classList.add('selected');
+  selectedPlan = 'monthly';
+});
+
+proceedPaymentBtn.addEventListener('click', async () => {
+  if (!selectedPlan) {
+    showToast('Please select a plan first!', 'warning');
+    return;
+  }
+  
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (!user) {
+    showToast('Please login first to subscribe', 'warning');
+    closeSubModal();
+    setTimeout(() => openAuthModal(), 500);
+    return;
+  }
+  
+  currentUserId = user.id;
+  closeSubModal();
+  setTimeout(() => {
+    openUPIModal(selectedPlan);
+  }, 400);
+});
+
+successContinueBtn.addEventListener('click', () => {
+  const overlay = document.getElementById('paymentSuccess');
+  overlay.classList.remove('show');
+  setTimeout(() => {
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }, 500);
+  window.location.href = '#builder';
+});
+
+// ============ PAYMENT SUCCESS ============
+function showPaymentSuccess(planName) {
+  const overlay = document.getElementById('paymentSuccess');
+  document.getElementById('selectedPlanDisplay').textContent = planName;
+  overlay.classList.add('open');
+  requestAnimationFrame(() => overlay.classList.add('show'));
+  document.body.style.overflow = 'hidden';
+}
+
 // ============ GENERATE PLAN ============
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
 async function generatePlan() {
-  if (!isSubscribed && !profile.complete) {
-    renderLockedPlaceholder();
+  if (!isSubscribed) {
+    setWorkoutBuilderLocked(true);
     return;
   }
 
   const { data: { user } } = await supabaseClient.auth.getUser();
-  if (!user) { renderLockedPlaceholder(); return; }
+  if (!user && !localStorage.getItem('peakpulse_subscribed')) { 
+    setWorkoutBuilderLocked(true);
+    return; 
+  }
 
   const split = SPLITS[state.days];
   if (!split) {
@@ -2317,21 +2915,35 @@ async function generatePlan() {
 
   state.currentPlan = { goal: state.goal, level: state.level, equipment: state.equipment, days: state.days, exercises };
 
-  await saveUserData(user.id, {
-    profile: { username: profile.username, name: profile.name, display_name: profile.name, goal: state.goal, level: state.level, equipment: state.equipment },
-    plan: state.currentPlan
-  });
+  if (user) {
+    await saveUserData(user.id, {
+      profile: { username: profile.username, name: profile.name, display_name: profile.name, goal: state.goal, level: state.level, equipment: state.equipment },
+      plan: state.currentPlan
+    });
 
-  const userData = await loadUserData(user.id);
-  renderChecklist(userData?.checklist || {});
+    const userData = await loadUserData(user.id);
+    renderChecklist(userData?.checklist || {});
+  } else {
+    renderChecklist({});
+  }
 }
-
-function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 // ============ CHECKLIST ============
 function renderChecklist(checklist) {
-  const container = document.getElementById('checklistContainer');
-  if (!container) return;
+  let container = document.getElementById('checklistContainer');
+  if (!container) {
+    const output = document.getElementById('algoOutput');
+    if (output) {
+      const newContainer = document.createElement('div');
+      newContainer.id = 'checklistContainer';
+      newContainer.className = 'checklist-container';
+      output.appendChild(newContainer);
+      container = newContainer;
+    } else {
+      return;
+    }
+  }
+  
   const plan = state.currentPlan;
   if (!plan || !plan.exercises) {
     container.innerHTML = `<p style="color:var(--text-muted);font-size:0.9rem;">Generate a workout plan to track your progress.</p>`;
@@ -2374,7 +2986,10 @@ function renderChecklist(checklist) {
   if (saveBtn) {
     saveBtn.addEventListener('click', async function() {
       const { data: { user } } = await supabaseClient.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        showToast('Please login to save progress', 'warning');
+        return;
+      }
 
       const checklistData = {};
       container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
@@ -2382,56 +2997,169 @@ function renderChecklist(checklist) {
       });
 
       await saveUserData(user.id, { checklist: checklistData });
-      alert('Progress saved!');
+      showToast('Progress saved!', 'success');
     });
   }
 }
 
-// ============ INIT ============
+// ============ LOAD USER DATA ============
+async function loadUserDataFromSupabase(userId) {
+  const userData = await loadUserData(userId);
+  if (!userData) {
+    profile.complete = false;
+    setWorkoutBuilderLocked(true);
+    renderChecklist({});
+    updateNavWithUser(null);
+    return;
+  }
+
+  profile.complete = true;
+  profile.name = userData.profile?.name || userData.profile?.display_name || 'you';
+  profile.username = userData.profile?.username || '';
+  
+  currentDisplayName = profile.name;
+  updateNavWithUser(currentDisplayName);
+  
+  if (userData.profile?.is_subscribed) {
+    isSubscribed = true;
+    localStorage.setItem('peakpulse_subscribed', 'true');
+    profile.complete = true;
+    setWorkoutBuilderLocked(false);
+  } else {
+    isSubscribed = false;
+    setWorkoutBuilderLocked(true);
+  }
+  
+  if (userData.plan) {
+    state.goal = userData.plan.goal || 'strength';
+    state.level = userData.plan.experience_level || 'beginner';
+    state.equipment = userData.plan.equipment || 'gym';
+    state.days = userData.plan.days || 4;
+    daysVal.textContent = state.days;
+    document.querySelectorAll('#goalRow .pill').forEach(p => p.classList.toggle('active', p.dataset.val === state.goal));
+    document.querySelectorAll('#levelRow .pill').forEach(p => p.classList.toggle('active', p.dataset.val === state.level));
+    document.querySelectorAll('#equipRow .pill').forEach(p => p.classList.toggle('active', p.dataset.val === state.equipment));
+    state.currentPlan = userData.plan;
+  } else {
+    state.currentPlan = null;
+  }
+
+  if (isSubscribed) {
+    setWorkoutBuilderLocked(false);
+    generatePlan();
+  } else {
+    setWorkoutBuilderLocked(true);
+  }
+  renderChecklist(userData.checklist || {});
+}
+
+// ============ ACTIVATE SUBSCRIPTION ============
+async function activateSubscriptionAutomatically(planType) {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    
+    if (user) {
+        const expiryDate = planType === 'weekly'
+            ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        
+        const { error } = await supabaseClient
+            .from('profiles')
+            .update({
+                is_subscribed: true,
+                subscription_plan: planType,
+                subscription_start: new Date().toISOString(),
+                subscription_end: expiryDate.toISOString()
+            })
+            .eq('user_id', user.id);
+        
+        if (error) throw new Error(error.message);
+    }
+    
+    isSubscribed = true;
+    localStorage.setItem('peakpulse_subscribed', 'true');
+    localStorage.setItem('peakpulse_plan', planType);
+    profile.complete = true;
+    
+    setWorkoutBuilderLocked(false);
+    generatePlan();
+}
+
+function getPlanName(planType) {
+    return planType === 'weekly' ? 'Weekly Plan - ₹999' : 'Monthly Plan - ₹2999';
+}
+
+// ============ EVENT LISTENERS ============
+document.getElementById('sendOTPBtn').addEventListener('click', requestOTP);
+
+document.getElementById('verifyOTPBtn').addEventListener('click', verifyOTP);
+
+document.getElementById('otpInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') verifyOTP();
+});
+
+document.getElementById('transactionIdInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') requestOTP();
+});
+
 document.getElementById('generateBtn').addEventListener('click', () => {
-  if (!isSubscribed && !profile.complete) {
+  if (!isSubscribed) {
+    showToast('Please subscribe to generate your workout plan!', 'warning');
     openSubModal();
   } else {
     generatePlan();
   }
 });
 
-// Override unlock button to open subscription modal
 document.addEventListener('click', function(e) {
   if (e.target.id === 'unlockBtn' || e.target.closest('#unlockBtn')) {
     openSubModal();
   }
 });
 
+function checkSubscriptionStatus() {
+  const saved = localStorage.getItem('peakpulse_subscribed');
+  if (saved === 'true') {
+    isSubscribed = true;
+    profile.complete = true;
+    setWorkoutBuilderLocked(false);
+    return true;
+  }
+  setWorkoutBuilderLocked(true);
+  return false;
+}
+
+// ============ INIT ============
 window.addEventListener('load', async () => {
-  // Check if user already has subscription from localStorage
+  setWorkoutBuilderLocked(true);
+  
   if (checkSubscriptionStatus()) {
     profile.complete = true;
   }
   
   const { data: { user } } = await supabaseClient.auth.getUser();
   if (user) {
+    currentUserId = user.id;
     await loadUserDataFromSupabase(user.id);
   } else {
-    // Check localStorage for subscription
     if (isSubscribed) {
       profile.complete = true;
+      setWorkoutBuilderLocked(false);
       generatePlan();
     } else {
-      renderLockedPlaceholder();
+      setWorkoutBuilderLocked(true);
       state.currentPlan = null;
       updateNavWithUser(null);
       setTimeout(() => openAuthModal(), 800);
     }
   }
   
-  // Start the typing animation after page loads
   setTimeout(startCoachTyping, 1000);
 });
+
+console.log('✅ PeakPulse with EmailJS OTP Verification loaded!');
+console.log('📧 From: completefitx@gmail.com');
+console.log('🔑 OTP:', FIXED_OTP);
+console.log('📱 UPI ID:', UPI_CONFIG.id);
 </script>
 </body>
 </html>
-<!-- Login enforcement patch placeholder added by ChatGPT. -->
-<script>
-// Please integrate requireLogin() around Get Started and Proceed to Payment handlers.
-</script>
