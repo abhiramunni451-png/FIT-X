@@ -174,6 +174,20 @@ body{
   color:var(--coral);
 }
 
+/* subscription timer in nav */
+.sub-timer {
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.7rem;
+  color:var(--volt);
+  background:var(--volt-dim);
+  padding:0.2rem 0.6rem;
+  border-radius:60px;
+  border:1px solid rgba(212,255,63,0.2);
+  display:inline-flex;
+  align-items:center;
+  gap:0.3rem;
+}
+
 /* ============ HERO ============ */
 .hero{
   padding:5.5rem 0 6rem; position:relative; overflow:hidden;
@@ -727,10 +741,15 @@ body{
   color:var(--text-primary);
   font-family:'Inter',sans-serif;
   font-size:0.92rem;
+  text-align:center;
+  letter-spacing:2px;
 }
 .transaction-input-group input:focus{
   outline:none;
   border-color:var(--volt);
+}
+.transaction-input-group input.error{
+  border-color:var(--red);
 }
 .transaction-input-group .btn-primary{
   padding:0.8rem 1.5rem;
@@ -869,32 +888,6 @@ body{
   50%{ width:70%; }
   100%{ width:100%; }
 }
-
-/* UPI Apps Grid */
-.upi-apps{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:0.6rem;
-  margin:1.2rem 0;
-}
-.upi-app-btn{
-  padding:0.6rem 0.4rem;
-  background:var(--bg-body);
-  border:1px solid var(--border-hover);
-  border-radius:0.6rem;
-  color:var(--text-secondary);
-  font-size:0.7rem;
-  cursor:pointer;
-  transition:all 0.2s ease;
-  text-align:center;
-  font-family:'Inter',sans-serif;
-}
-.upi-app-btn:hover{
-  border-color:var(--volt);
-  color:var(--text-primary);
-  transform:translateY(-2px);
-}
-.upi-app-btn i{ font-size:1.2rem; display:block; margin-bottom:0.3rem; }
 
 /* ============ SUBSCRIPTION MODAL ============ */
 .sub-modal-overlay{
@@ -1287,7 +1280,6 @@ body{
   .coach-modal-image{ min-height:300px; border-radius:1.5rem 1.5rem 0 0; }
   .free-features-grid{ grid-template-columns:1fr 1fr; }
   .sub-plans{ grid-template-columns:1fr; max-width:300px; margin:0 auto; }
-  .upi-apps{ grid-template-columns:repeat(2,1fr); }
 }
 @media (max-width:650px){
   .container{ padding:0 1.2rem; }
@@ -1312,7 +1304,6 @@ body{
   .sub-modal-box{ padding:1.8rem; }
   .sub-plans{ grid-template-columns:1fr; max-width:100%; }
   .upi-modal-box{ padding:1.8rem; }
-  .upi-apps{ grid-template-columns:repeat(2,1fr); }
   .transaction-input-group{ flex-direction:column; }
   .otp-input-group{ flex-direction:column; }
 
@@ -1537,7 +1528,7 @@ body{
           <li><i class="fas fa-check"></i> Accountability check-ins</li>
         </ul>
         <button class="btn-primary" id="subscribeBtn" style="width:100%; justify-content:center;"><i class="fas fa-bolt"></i> Get Started</button>
-        <p style="text-align:center; margin-top:0.8rem; color:var(--text-muted); font-size:0.75rem;">No hidden fees. Cancel anytime.</p>
+        <p style="text-align:center; margin-top:0.8rem; color:var(--text-muted); font-size:0.75rem;">No hidden fees. If already active user no need for subscription.</p>
       </div>
     </div>
   </div>
@@ -1593,18 +1584,12 @@ body{
         <p style="color:var(--text-muted); font-size:0.8rem; margin-top:0.3rem;">Pay using any UPI app</p>
       </div>
     </div>
-    <div class="upi-apps">
-      <button class="upi-app-btn" data-app="gpay"><i class="fab fa-google-pay"></i>GPay</button>
-      <button class="upi-app-btn" data-app="phonepe"><i class="fas fa-mobile-alt"></i>PhonePe</button>
-      <button class="upi-app-btn" data-app="paytm"><i class="fas fa-rupee-sign"></i>Paytm</button>
-      <button class="upi-app-btn" data-app="others"><i class="fas fa-qrcode"></i>Others</button>
-    </div>
     
     <!-- Transaction ID Input -->
     <div class="transaction-section">
-      <label>Enter Transaction ID</label>
+      <label>Enter Transaction ID (12 digits)</label>
       <div class="transaction-input-group">
-        <input type="text" id="transactionIdInput" placeholder="TXN1234567890" maxlength="20">
+        <input type="text" id="transactionIdInput" maxlength="12" inputmode="numeric" pattern="[0-9]*">
         <button class="btn-primary" id="sendOTPBtn"><i class="fas fa-envelope"></i> Send OTP</button>
       </div>
     </div>
@@ -1771,6 +1756,8 @@ let selectedPlan = null;
 let isSubscribed = false;
 let currentUserId = null;
 let currentQRCode = null;
+let subscriptionEnd = null;
+let subscriptionTimerInterval = null;
 
 // ============ UPI CONFIGURATION ============
 const UPI_CONFIG = {
@@ -1863,10 +1850,16 @@ async function sendOTPEmail(userEmail, userName, transactionId, planType) {
 async function requestOTP() {
     const transactionId = document.getElementById('transactionIdInput').value.trim();
     
-    if (!transactionId) {
-        showToast('Please enter your transaction ID first!', 'warning');
+    // Validate 12 digit transaction ID
+    if (!transactionId || transactionId.length !== 12 || !/^\d{12}$/.test(transactionId)) {
+        const input = document.getElementById('transactionIdInput');
+        input.classList.add('error');
+        showToast('Please enter a valid 12-digit transaction ID (numbers only)', 'warning');
+        setTimeout(() => input.classList.remove('error'), 3000);
         return;
     }
+    
+    document.getElementById('transactionIdInput').classList.remove('error');
     
     const { data: { user } } = await supabaseClient.auth.getUser();
     
@@ -1899,7 +1892,7 @@ async function requestOTP() {
     `;
 
     // Send OTP email
-    const result = await sendOTPEmail(userEmail, FIXED_OTP, userName, transactionId);
+    const result = await sendOTPEmail(userEmail, userName, transactionId, selectedPlan);
 
     if (result.success) {
         statusEl.className = 'otp-status visible pending';
@@ -2028,7 +2021,7 @@ async function resendOTP() {
     statusEl.className = 'otp-status visible pending';
     statusEl.innerHTML = '⏳ Resending OTP...';
     
-    await sendOTPEmail(email, FIXED_OTP, profile.name || 'User', transactionId);
+    await sendOTPEmail(email, profile.name || 'User', transactionId, selectedPlan);
     
     document.getElementById('otpResendBtn').style.display = 'none';
     document.getElementById('otpInput').disabled = false;
@@ -2335,6 +2328,44 @@ function setWorkoutBuilderLocked(locked) {
   }
 }
 
+// ============ SUBSCRIPTION TIMER ============
+function updateSubscriptionTimer() {
+  const navContainer = document.getElementById('authNavContainer');
+  const existingTimer = navContainer.querySelector('.sub-timer');
+  
+  if (!isSubscribed || !subscriptionEnd) {
+    if (existingTimer) existingTimer.remove();
+    return;
+  }
+  
+  const now = new Date();
+  const end = new Date(subscriptionEnd);
+  const diff = end - now;
+  
+  if (diff <= 0) {
+    if (existingTimer) existingTimer.remove();
+    return;
+  }
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  
+  let timerText = '';
+  if (days > 0) timerText = `${days}d ${hours}h`;
+  else if (hours > 0) timerText = `${hours}h ${mins}m`;
+  else timerText = `${mins}m`;
+  
+  if (!existingTimer) {
+    const timerEl = document.createElement('span');
+    timerEl.className = 'sub-timer';
+    timerEl.innerHTML = `<i class="fas fa-clock"></i> ${timerText} left`;
+    navContainer.appendChild(timerEl);
+  } else {
+    existingTimer.innerHTML = `<i class="fas fa-clock"></i> ${timerText} left`;
+  }
+}
+
 // ============ SUPABASE FUNCTIONS ============
 async function saveUserData(userId, data) {
   try {
@@ -2467,8 +2498,14 @@ function updateNavWithUser(displayName) {
         await supabaseClient.auth.signOut();
         currentDisplayName = '';
         isSubscribed = false;
+        subscriptionEnd = null;
         localStorage.removeItem('fitx_subscribed');
         localStorage.removeItem('fitx_plan');
+        localStorage.removeItem('fitx_sub_end');
+        if (subscriptionTimerInterval) {
+          clearInterval(subscriptionTimerInterval);
+          subscriptionTimerInterval = null;
+        }
         updateNavWithUser(null);
         setWorkoutBuilderLocked(true);
         window.location.reload();
@@ -2481,6 +2518,7 @@ function updateNavWithUser(displayName) {
       authBtn.addEventListener('click', (e) => { e.preventDefault(); openAuthModal(); });
     }
   }
+  updateSubscriptionTimer();
 }
 
 // ============ AUTH FUNCTIONS ============
@@ -2732,35 +2770,6 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && upiModal.classList.contains('open')) {
     closeUPIModal();
   }
-});
-
-// ============ UPI APP HANDLERS ============
-document.querySelectorAll('.upi-app-btn').forEach(btn => {
-  btn.addEventListener('click', function() {
-    const app = this.dataset.app;
-    const upiId = UPI_CONFIG.id;
-    const amount = document.getElementById('upiAmountDisplay').textContent.replace('₹', '');
-    const transactionId = document.querySelector('#upiQRContainer')?.dataset?.transactionId || 'PP_' + Date.now();
-    
-    let upiDeepLink = '';
-    switch(app) {
-      case 'gpay':
-        upiDeepLink = `gpay://upi/pay?pa=${upiId}&pn=${UPI_CONFIG.name}&am=${amount}&cu=INR&tn=${transactionId}`;
-        break;
-      case 'phonepe':
-        upiDeepLink = `phonepe://upi/pay?pa=${upiId}&pn=${UPI_CONFIG.name}&am=${amount}&cu=INR&tn=${transactionId}`;
-        break;
-      case 'paytm':
-        upiDeepLink = `paytm://upi/pay?pa=${upiId}&pn=${UPI_CONFIG.name}&am=${amount}&cu=INR&tn=${transactionId}`;
-        break;
-      default:
-        copyUPIId();
-        return;
-    }
-    
-    window.location.href = upiDeepLink;
-    showToast('Payment initiated. Please enter the transaction ID after payment.', 'info');
-  });
 });
 
 // ============ SUBSCRIPTION MODAL ============
@@ -3033,13 +3042,27 @@ async function loadUserDataFromSupabase(userId) {
   currentDisplayName = profile.name;
   updateNavWithUser(currentDisplayName);
   
+  // Check subscription
   if (userData.profile?.is_subscribed) {
     isSubscribed = true;
     localStorage.setItem('fitx_subscribed', 'true');
+    
+    if (userData.profile?.subscription_end) {
+      subscriptionEnd = userData.profile.subscription_end;
+      localStorage.setItem('fitx_sub_end', subscriptionEnd);
+    }
+    
     profile.complete = true;
     setWorkoutBuilderLocked(false);
+    
+    // Start timer update
+    if (subscriptionTimerInterval) clearInterval(subscriptionTimerInterval);
+    subscriptionTimerInterval = setInterval(updateSubscriptionTimer, 60000);
+    updateSubscriptionTimer();
   } else {
     isSubscribed = false;
+    subscriptionEnd = null;
+    localStorage.removeItem('fitx_sub_end');
     setWorkoutBuilderLocked(true);
   }
   
@@ -3071,9 +3094,9 @@ async function activateSubscriptionAutomatically(planType) {
     const { data: { user } } = await supabaseClient.auth.getUser();
     
     if (user) {
-        const expiryDate = planType === 'weekly'
-            ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const duration = planType === 'weekly' ? 7 : 30;
+        const expiryDate = new Date(Date.now() + duration * 24 * 60 * 60 * 1000);
+        subscriptionEnd = expiryDate.toISOString();
         
         const { error } = await supabaseClient
             .from('profiles')
@@ -3086,12 +3109,18 @@ async function activateSubscriptionAutomatically(planType) {
             .eq('user_id', user.id);
         
         if (error) throw new Error(error.message);
+        
+        localStorage.setItem('fitx_sub_end', subscriptionEnd);
     }
     
     isSubscribed = true;
     localStorage.setItem('fitx_subscribed', 'true');
     localStorage.setItem('fitx_plan', planType);
     profile.complete = true;
+    
+    if (subscriptionTimerInterval) clearInterval(subscriptionTimerInterval);
+    subscriptionTimerInterval = setInterval(updateSubscriptionTimer, 60000);
+    updateSubscriptionTimer();
     
     setWorkoutBuilderLocked(false);
     generatePlan();
@@ -3100,6 +3129,14 @@ async function activateSubscriptionAutomatically(planType) {
 function getPlanName(planType) {
     return planType === 'weekly' ? 'Weekly Plan - ₹999' : 'Monthly Plan - ₹2999';
 }
+
+// ============ TRANSACTION ID VALIDATION ============
+document.getElementById('transactionIdInput').addEventListener('input', function() {
+    this.value = this.value.replace(/[^0-9]/g, '');
+    if (this.value.length === 12) {
+        this.classList.remove('error');
+    }
+});
 
 // ============ EVENT LISTENERS ============
 document.getElementById('sendOTPBtn').addEventListener('click', requestOTP);
@@ -3134,6 +3171,13 @@ function checkSubscriptionStatus() {
   if (saved === 'true') {
     isSubscribed = true;
     profile.complete = true;
+    const end = localStorage.getItem('fitx_sub_end');
+    if (end) {
+      subscriptionEnd = end;
+      if (subscriptionTimerInterval) clearInterval(subscriptionTimerInterval);
+      subscriptionTimerInterval = setInterval(updateSubscriptionTimer, 60000);
+      updateSubscriptionTimer();
+    }
     setWorkoutBuilderLocked(false);
     return true;
   }
