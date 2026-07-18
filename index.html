@@ -219,14 +219,37 @@ body{
 .hero-proof .proof-text strong{ color:var(--text-primary); }
 
 /* ============ MARQUEE ============ */
-.marquee-band{ background:var(--bg-card); border-bottom:1px solid var(--border); padding:1.1rem 0; overflow:hidden; }
-.marquee-track{ display:flex; width:max-content; animation:marquee 32s linear infinite; }
+.marquee-band{ 
+  background:var(--bg-card); 
+  border-bottom:1px solid var(--border); 
+  padding:1.1rem 0; 
+  overflow:hidden;
+  width:100%;
+}
+.marquee-track{ 
+  display:flex; 
+  width:max-content; 
+  animation:marquee 32s linear infinite;
+  will-change:transform;
+}
 .marquee-track span{
-  display:flex; align-items:center; gap:0.8rem; font-family:'Bebas Neue',sans-serif; font-size:1.3rem;
-  letter-spacing:0.03em; color:var(--text-muted); text-transform:uppercase; padding:0 2rem; white-space:nowrap;
+  display:flex; 
+  align-items:center; 
+  gap:0.8rem; 
+  font-family:'Bebas Neue',sans-serif; 
+  font-size:1.3rem;
+  letter-spacing:0.03em; 
+  color:var(--text-muted); 
+  text-transform:uppercase; 
+  padding:0 2rem; 
+  white-space:nowrap;
+  flex-shrink:0;
 }
 .marquee-track span i{ color:var(--volt); font-size:0.6rem; }
-@keyframes marquee{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
+@keyframes marquee{ 
+  0%{ transform:translateX(0); } 
+  100%{ transform:translateX(-50%); } 
+}
 
 /* ============ CATEGORIES ============ */
 .categories{ background:var(--bg-section); position:relative; }
@@ -1319,6 +1342,10 @@ body{
   .checklist-item .ex-muscles{ font-size:0.85rem; flex-basis:100%; order:3; }
   .checklist-item .ex-scheme{ font-size:0.9rem; }
   .checklist-container h5{ font-size:0.9rem; }
+  
+  /* Fix marquee on mobile */
+  .marquee-band{ padding:0.8rem 0; }
+  .marquee-track span{ font-size:1rem; padding:0 1rem; }
 }
 @media (max-width:400px){
   .hero-content h1{ font-size:2.05rem; }
@@ -1377,7 +1404,7 @@ body{
 
 <!-- MARQUEE -->
 <div class="marquee-band">
-  <div class="marquee-track">
+  <div class="marquee-track" id="marqueeTrack">
     <span><i class="fas fa-circle"></i>STRENGTH &amp; CONDITIONING<i class="fas fa-circle"></i>WEIGHT MANAGEMENT<i class="fas fa-circle"></i>BODY TRANSFORMATION<i class="fas fa-circle"></i>PERSONAL TRAINING<i class="fas fa-circle"></i>FUNCTIONAL STRENGTH TRAINING</span>
     <span><i class="fas fa-circle"></i>STRENGTH &amp; CONDITIONING<i class="fas fa-circle"></i>WEIGHT MANAGEMENT<i class="fas fa-circle"></i>BODY TRANSFORMATION<i class="fas fa-circle"></i>PERSONAL TRAINING<i class="fas fa-circle"></i>FUNCTIONAL STRENGTH TRAINING</span>
   </div>
