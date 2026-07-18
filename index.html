@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PeakPulse · Train With Data</title>
+<title>FIT-X · Train With Data</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1315,6 +1315,19 @@ body{
   .upi-apps{ grid-template-columns:repeat(2,1fr); }
   .transaction-input-group{ flex-direction:column; }
   .otp-input-group{ flex-direction:column; }
+
+  /* Larger, more readable workout text on mobile */
+  .exercise-row{ font-size:1.05rem; padding:0.65rem 0; flex-wrap:wrap; row-gap:0.25rem; }
+  .exercise-row .ex-name{ font-size:1.05rem; }
+  .exercise-row .ex-scheme{ font-size:0.95rem; }
+  .exercise-row .ex-muscles{ font-size:0.85rem; flex-basis:100%; }
+  .day-card .day-title strong{ font-size:1.1rem; }
+  .day-card .day-title span{ font-size:0.8rem; }
+  .checklist-item{ padding:0.7rem 0.8rem; flex-wrap:wrap; }
+  .checklist-item .ex-name{ font-size:1.05rem; flex-basis:70%; }
+  .checklist-item .ex-muscles{ font-size:0.85rem; flex-basis:100%; order:3; }
+  .checklist-item .ex-scheme{ font-size:0.9rem; }
+  .checklist-container h5{ font-size:0.9rem; }
 }
 @media (max-width:400px){
   .hero-content h1{ font-size:2.05rem; }
@@ -1334,7 +1347,7 @@ body{
 <!-- NAVBAR -->
 <nav class="navbar" id="navbar">
   <div class="container nav-inner">
-    <a href="#" class="logo"><span class="pulse-dot"></span>PEAKPULSE</a>
+    <a href="#" class="logo"><span class="pulse-dot"></span>FIT-X</a>
     <button class="nav-toggle" id="navToggle" aria-label="Toggle menu"><i class="fas fa-bars"></i></button>
     <ul class="nav-links" id="navLinks">
       <li><a href="#categories">Services</a></li>
@@ -1356,7 +1369,7 @@ body{
     <div class="hero-content">
       <div class="hero-eyebrow"><span class="live-dot"></span><span class="eyebrow" style="margin:0;">Build Your Fitness Journey</span></div>
       <h1>Train With <span class="hl">Purpose</span>,<br>Not Guesswork</h1>
-      <p>PeakPulse builds your weekly training plan from your goal, level and schedule — then tracks every rep of progress along the way.</p>
+      <p>FIT-X builds your weekly training plan from your goal, level and schedule — then tracks every rep of progress along the way.</p>
       <div class="hero-buttons">
         <a href="#builder" class="btn-primary"><i class="fas fa-bolt"></i> Build My Plan</a>
         <a href="#categories" class="btn-outline">Explore Services</a>
@@ -1633,7 +1646,7 @@ body{
   <div class="payment-success-box">
     <div class="success-icon"><i class="fas fa-check-circle"></i></div>
     <h2>Payment Successful!</h2>
-    <p>Thank you for subscribing to PeakPulse.</p>
+    <p>Thank you for subscribing to FIT-X.</p>
     <div class="plan-detail" id="selectedPlanDisplay">Weekly Plan - ₹999</div>
     <p style="font-size:0.8rem; color:var(--text-muted);">Your fitness journey starts now. Your personalized plan is now unlocked!</p>
     <br>
@@ -1679,7 +1692,7 @@ body{
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a href="#" class="logo" style="font-size:1.4rem;"><span class="pulse-dot"></span>PEAKPULSE</a>
+        <a href="#" class="logo" style="font-size:1.4rem;"><span class="pulse-dot"></span>FIT-X</a>
         <p>Your partner in peak performance. Strength, conditioning, and transformation.</p>
       </div>
       <div class="footer-links"><h5>Explore</h5><a href="#categories">Services</a><a href="#coaches">Coach</a><a href="#builder">Build My Plan</a><a href="#pricing">Pricing</a></div>
@@ -1695,7 +1708,7 @@ body{
         <div class="newsletter"><input type="email" placeholder="you@email.com"><button>Join</button></div>
       </div>
     </div>
-    <div class="footer-bottom">&copy; 2026 PeakPulse Fitness. All rights reserved. | Trainer: Jerin Babu</div>
+    <div class="footer-bottom">&copy; 2026 FIT-X Fitness. All rights reserved. | Trainer: Jerin Babu</div>
   </div>
 </footer>
 
@@ -1704,7 +1717,7 @@ body{
   <div class="modal-box">
     <button class="modal-close-x" id="authModalClose" type="button" aria-label="Close"><i class="fas fa-times"></i></button>
     <h3 id="authModalTitle"><i class="fas fa-sign-in-alt" style="color:var(--volt);margin-right:8px;"></i>Login</h3>
-    <p class="modal-sub" id="authModalSub">Access your PeakPulse account</p>
+    <p class="modal-sub" id="authModalSub">Access your FIT-X account</p>
     <form id="authForm" novalidate>
       <div class="form-group" id="fg-username">
         <label><i class="fas fa-user" style="margin-right:6px;"></i> Username</label>
@@ -1763,7 +1776,7 @@ let currentQRCode = null;
 const UPI_CONFIG = {
   id: 'jerinbabu482@okaxis',
   name: 'Jerin Babu',
-  merchant: 'PeakPulse'
+  merchant: 'FIT-X'
 };
 
 // ============ EMAILJS CONFIGURATION ============
@@ -1825,7 +1838,7 @@ async function sendOTPEmail(userEmail, userName, transactionId, planType) {
 
         const templateParams = {
             to_email: userEmail,
-            user_name: userName || 'PeakPulse User',
+            user_name: userName || 'FIT-X User',
             passcode: FIXED_OTP,
             plan_name: planName,
             transaction_id: transactionId || 'N/A'
@@ -2454,8 +2467,8 @@ function updateNavWithUser(displayName) {
         await supabaseClient.auth.signOut();
         currentDisplayName = '';
         isSubscribed = false;
-        localStorage.removeItem('peakpulse_subscribed');
-        localStorage.removeItem('peakpulse_plan');
+        localStorage.removeItem('fitx_subscribed');
+        localStorage.removeItem('fitx_plan');
         updateNavWithUser(null);
         setWorkoutBuilderLocked(true);
         window.location.reload();
@@ -2498,7 +2511,7 @@ document.getElementById('authToggleBtn').addEventListener('click', () => {
   
   if (isLoginMode) {
     title.innerHTML = '<i class="fas fa-sign-in-alt" style="color:var(--volt);margin-right:8px;"></i>Login';
-    sub.textContent = 'Access your PeakPulse account';
+    sub.textContent = 'Access your FIT-X account';
     submitBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Login';
     toggleText.textContent = "Don't have an account?";
     document.getElementById('authToggleBtn').textContent = 'Register';
@@ -2506,7 +2519,7 @@ document.getElementById('authToggleBtn').addEventListener('click', () => {
     emailField.style.display = 'none';
   } else {
     title.innerHTML = '<i class="fas fa-user-plus" style="color:var(--volt);margin-right:8px;"></i>Register';
-    sub.textContent = 'Create your PeakPulse account';
+    sub.textContent = 'Create your FIT-X account';
     submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Register';
     toggleText.textContent = 'Already have an account?';
     document.getElementById('authToggleBtn').textContent = 'Login';
@@ -2666,7 +2679,7 @@ function openUPIModal(planType) {
   } catch (e) {
     qrContainer.innerHTML = `
       <div style="background:white; padding:1rem; border-radius:0.5rem; text-align:center;">
-        <p style="color:#000; font-size:1.2rem; font-weight:bold;">PeakPulse</p>
+        <p style="color:#000; font-size:1.2rem; font-weight:bold;">FIT-X</p>
         <p style="color:#000; font-size:1rem;">UPI: ${UPI_CONFIG.id}</p>
         <p style="color:#000; font-size:1.2rem;">₹${upiData.amount}</p>
         <button class="btn-primary" onclick="copyUPIId()" style="margin-top:0.5rem;">
@@ -2847,7 +2860,7 @@ async function generatePlan() {
   }
 
   const { data: { user } } = await supabaseClient.auth.getUser();
-  if (!user && !localStorage.getItem('peakpulse_subscribed')) { 
+  if (!user && !localStorage.getItem('fitx_subscribed')) { 
     setWorkoutBuilderLocked(true);
     return; 
   }
@@ -3022,7 +3035,7 @@ async function loadUserDataFromSupabase(userId) {
   
   if (userData.profile?.is_subscribed) {
     isSubscribed = true;
-    localStorage.setItem('peakpulse_subscribed', 'true');
+    localStorage.setItem('fitx_subscribed', 'true');
     profile.complete = true;
     setWorkoutBuilderLocked(false);
   } else {
@@ -3076,8 +3089,8 @@ async function activateSubscriptionAutomatically(planType) {
     }
     
     isSubscribed = true;
-    localStorage.setItem('peakpulse_subscribed', 'true');
-    localStorage.setItem('peakpulse_plan', planType);
+    localStorage.setItem('fitx_subscribed', 'true');
+    localStorage.setItem('fitx_plan', planType);
     profile.complete = true;
     
     setWorkoutBuilderLocked(false);
@@ -3117,7 +3130,7 @@ document.addEventListener('click', function(e) {
 });
 
 function checkSubscriptionStatus() {
-  const saved = localStorage.getItem('peakpulse_subscribed');
+  const saved = localStorage.getItem('fitx_subscribed');
   if (saved === 'true') {
     isSubscribed = true;
     profile.complete = true;
@@ -3156,7 +3169,7 @@ window.addEventListener('load', async () => {
   setTimeout(startCoachTyping, 1000);
 });
 
-console.log('✅ PeakPulse with EmailJS OTP Verification loaded!');
+console.log('✅ FIT-X with EmailJS OTP Verification loaded!');
 console.log('📧 From: completefitx@gmail.com');
 console.log('🔑 OTP:', FIXED_OTP);
 console.log('📱 UPI ID:', UPI_CONFIG.id);
